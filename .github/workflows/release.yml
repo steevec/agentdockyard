@@ -1,7 +1,7 @@
 name: Release
 
-# Déclenche un build + release complet dès qu'un tag vX.Y.Z est poussé.
-# Le tag doit correspondre exactement à la version du package.json.
+# Declenche un build + release complet des qu'un tag vX.Y.Z est pousse.
+# Le tag doit correspondre exactement a la version du package.json.
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
       - 'v*.*.*'
 
 permissions:
-  contents: write  # nécessaire pour créer la release et uploader les assets
+  contents: write  # necessaire pour creer la release et uploader les assets
 
 jobs:
   release:
@@ -41,15 +41,48 @@ jobs:
       - name: Build agent.exe (PyInstaller)
         run: npm run build:agent
 
-      - name: Build Electron installer + portable
+      - name: Build Electron installer + portable (no publish)
         env:
-          # electron-builder détecte ce token et publie automatiquement
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Pas de signature en v1 (pas de cert). Empêche electron-builder d'essayer.
+          # Pas de signature en v1 (pas de cert). Empeche electron-builder d essayer.
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-        run: npx electron-builder --win --publish always
+        # --publish never : on laisse la step suivante publier la release
+        # (electron-builder creerait sinon une release en mode draft).
+        run: npx electron-builder --win --publish never
 
-      - name: Upload build artefacts (for debugging)
+      - name: List build artefacts
+        shell: bash
+        run: ls -lh dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: AgentDockyard ${{ github.ref_name }}
+          body: |
+            **AgentDockyard ${{ github.ref_name }}**
+
+            See [CHANGELOG.md](https://github.com/steevec/agentdockyard/blob/main/CHANGELOG.md) for the full release notes.
+
+            ### Download
+
+            - **Installer** : `AgentDockyard-Setup-*.exe` (recommended - creates desktop/start-menu shortcuts)
+            - **Portable** : `AgentDockyard-Portable-*.exe` (no install, just run)
+
+            Windows SmartScreen may warn on first launch as the installer is not code-signed yet.
+
+            ### Auto-update
+
+            Existing installations update automatically from this release.
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
+          files: |
+            dist/AgentDockyard-Setup-*.exe
+            dist/AgentDockyard-Portable-*.exe
+            dist/AgentDockyard-Setup-*.exe.blockmap
+            dist/latest.yml
+
+      - name: Upload build artefacts (backup)
         if: always()
         uses: actions/upload-artifact@v4
         with:
