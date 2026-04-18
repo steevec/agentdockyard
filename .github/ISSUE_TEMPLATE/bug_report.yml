@@ -1,0 +1,74 @@
+name: Bug report
+description: Something is broken or behaves unexpectedly.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug!
+        Please fill in the fields below — the more precise, the faster we can help.
+
+  - type: input
+    id: version
+    attributes:
+      label: AgentDockyard version
+      description: Visible in Settings → About, or the installer filename.
+      placeholder: "1.0.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install_method
+    attributes:
+      label: How did you install?
+      options:
+        - Installer (Setup.exe)
+        - Portable (Portable.exe)
+        - Built from source
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "Windows 11 23H2 / Windows 10 22H2 / ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what did you get instead?
+      placeholder: |
+        1. I clicked on ...
+        2. Expected ...
+        3. Got ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / error output (optional)
+      description: |
+        If there's a visible error, paste it here. For the packaged app you can check
+        `%APPDATA%\AgentDockyard\logs\main.log` (if logs are enabled).
+      render: shell
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else? (screenshots, reproducing conditions...)
+
+  - type: checkboxes
+    id: sanity
+    attributes:
+      label: Pre-flight
+      options:
+        - label: I searched the existing issues and didn't find a duplicate.
+          required: true
+        - label: I'm on the latest release (or `main` if building from source).
+          required: true

@@ -1,0 +1,62 @@
+name: Release
+
+# Déclenche un build + release complet dès qu'un tag vX.Y.Z est poussé.
+# Le tag doit correspondre exactement à la version du package.json.
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write  # nécessaire pour créer la release et uploader les assets
+
+jobs:
+  release:
+    name: Build & publish installer
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install PyInstaller
+        run: python -m pip install --upgrade pip pyinstaller
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build agent.exe (PyInstaller)
+        run: npm run build:agent
+
+      - name: Build Electron installer + portable
+        env:
+          # electron-builder détecte ce token et publie automatiquement
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Pas de signature en v1 (pas de cert). Empêche electron-builder d'essayer.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npx electron-builder --win --publish always
+
+      - name: Upload build artefacts (for debugging)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ github.ref_name }}
+          path: |
+            dist/*.exe
+            dist/latest.yml
+            dist/*.blockmap
+          if-no-files-found: warn
+          retention-days: 14

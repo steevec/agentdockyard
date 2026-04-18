@@ -1,0 +1,48 @@
+name: Feature request
+description: Suggest an idea or an improvement.
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea! Please describe the **problem** you're trying to solve first,
+        then your proposed **solution**. That helps a lot when prioritising.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's the problem?
+      description: Which workflow pain point would this fix? Who suffers from it?
+      placeholder: |
+        I work with 3 agents across 5 repos and I can't easily see ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed
+    attributes:
+      label: Proposed solution
+      description: How would you like AgentDockyard to handle it?
+      placeholder: |
+        Add a filter in the header that ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else? (mockups, examples, screenshots...)
+
+  - type: checkboxes
+    id: sanity
+    attributes:
+      label: Pre-flight
+      options:
+        - label: I searched the existing issues/discussions and didn't find a duplicate.
+          required: true
