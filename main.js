@@ -13,7 +13,45 @@ const { app, BrowserWindow, ipcMain, screen, dialog, shell } = require('electron
 const path            = require('path');
 const fs              = require('fs');
 const { spawnSync }   = require('child_process');
-const { autoUpdater } = require('electron-updater');
+
+// electron-updater : lazy-load pour ne pas crasher en dev (il appelle app.getVersion() au require)
+let _autoUpdater = null;
+function getAutoUpdater() {
+  if (_autoUpdater) return _autoUpdater;
+  _autoUpdater = require('electron-updater').autoUpdater;
+  _autoUpdater.autoDownload         = false;
+  _autoUpdater.autoInstallOnAppQuit = true;
+
+  _autoUpdater.on('update-available', (info) => {
+    if (!mainWindow) return;
+    const r = dialog.showMessageBoxSync(mainWindow, {
+      type: 'info',
+      title: 'Mise a jour disponible',
+      message: `AgentDockyard v${info.version} est disponible.\nVoulez-vous la telecharger ?`,
+      buttons: ['Telecharger', 'Plus tard'],
+      defaultId: 0,
+    });
+    if (r === 0) _autoUpdater.downloadUpdate();
+  });
+
+  _autoUpdater.on('update-downloaded', () => {
+    if (!mainWindow) return;
+    const r = dialog.showMessageBoxSync(mainWindow, {
+      type: 'info',
+      title: 'Pret a installer',
+      message: 'La mise a jour a ete telechargee.\nAgentDockyard va redemarrer pour l\'appliquer.',
+      buttons: ['Redemarrer', 'Plus tard'],
+      defaultId: 0,
+    });
+    if (r === 0) _autoUpdater.quitAndInstall();
+  });
+
+  _autoUpdater.on('error', (err) => {
+    console.error('[updater] error:', err && err.message);
+  });
+
+  return _autoUpdater;
+}
 
 // ─── Chemins ──────────────────────────────────────────────────────────────────
 const IS_PACKAGED = app.isPackaged;
@@ -325,7 +363,8 @@ app.whenReady().then(() => {
 
   if (IS_PACKAGED) {
     setTimeout(() => {
-      autoUpdater.checkForUpdates().catch(() => { /* silencieux */ });
+      try { getAutoUpdater().checkForUpdates().catch(() => { /* silencieux */ }); }
+      catch (e) { console.error('[updater] init failed:', e.message); }
     }, 15000);
   }
 
@@ -336,38 +375,6 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
-});
-
-// ─── electron-updater ─────────────────────────────────────────────────────────
-autoUpdater.autoDownload         = false;
-autoUpdater.autoInstallOnAppQuit = true;
-
-autoUpdater.on('update-available', (info) => {
-  if (!mainWindow) return;
-  const r = dialog.showMessageBoxSync(mainWindow, {
-    type: 'info',
-    title: 'Mise a jour disponible',
-    message: `AgentDockyard v${info.version} est disponible.\nVoulez-vous la telecharger ?`,
-    buttons: ['Telecharger', 'Plus tard'],
-    defaultId: 0,
-  });
-  if (r === 0) autoUpdater.downloadUpdate();
-});
-
-autoUpdater.on('update-downloaded', () => {
-  if (!mainWindow) return;
-  const r = dialog.showMessageBoxSync(mainWindow, {
-    type: 'info',
-    title: 'Pret a installer',
-    message: 'La mise a jour a ete telechargee.\nAgentDockyard va redemarrer pour l\'appliquer.',
-    buttons: ['Redemarrer', 'Plus tard'],
-    defaultId: 0,
-  });
-  if (r === 0) autoUpdater.quitAndInstall();
-});
-
-autoUpdater.on('error', (err) => {
-  console.error('[updater] error:', err && err.message);
 });
 
 // ─── IPC : gestion des taches ─────────────────────────────────────────────────
@@ -476,7 +483,7 @@ ipcMain.handle('open-external', (event, url) => {
 ipcMain.handle('check-for-updates', async () => {
   if (!IS_PACKAGED) return { available: false, dev: true };
   try {
-    const r = await autoUpdater.checkForUpdates();
+    const r = await getAutoUpdater().checkForUpdates();
     if (r && r.updateInfo && r.updateInfo.version && r.updateInfo.version !== app.getVersion()) {
       return { available: true, version: r.updateInfo.version };
     }

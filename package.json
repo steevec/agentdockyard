@@ -19,7 +19,7 @@
     "url": "https://github.com/steevec/agentdockyard/issues"
   },
   "scripts": {
-    "start": "electron .",
+    "start": "node scripts/dev-start.js",
     "build:agent": "node scripts/build-agent.js",
     "build": "npm run build:agent && electron-builder --win",
     "build:portable": "npm run build:agent && electron-builder --win portable",
@@ -63,8 +63,18 @@
     ],
     "win": {
       "target": [
-        { "target": "nsis",     "arch": ["x64"] },
-        { "target": "portable", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "assets/icon.ico",
       "artifactName": "AgentDockyard-${version}-${arch}-${os}.${ext}"
@@ -75,7 +85,10 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "AgentDockyard",
-      "installerLanguages": ["fr_FR", "en_US"],
+      "installerLanguages": [
+        "fr_FR",
+        "en_US"
+      ],
       "language": "1036",
       "artifactName": "AgentDockyard-Setup-${version}.${ext}",
       "deleteAppDataOnUninstall": false
