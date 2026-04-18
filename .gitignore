@@ -1,0 +1,44 @@
+# ─── Node & Electron ─────────────────────────────────────────
+node_modules/
+dist/
+dist-agent/
+build-agent-tmp/
+*.spec
+out/
+
+# ─── Donnees locales de developpement ────────────────────────
+tasks.db
+tasks.db-journal
+tasks.db-wal
+tasks.db-shm
+tasks.json
+tasks.json.bak
+tasks.json.migrated
+tasks_test*.db
+test_*.db
+config.json
+agentdockyard-export-*.json
+
+# ─── Python ──────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+
+# ─── OS ──────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.fuse_hidden*
+desktop.ini
+
+# ─── Editeurs ────────────────────────────────────────────────
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+
+# ─── Memoire agent (generee, ne pas versionner) ──────────────
+CLAUDE.md
+AGENTS.md
+.github/copilot-instructions.md

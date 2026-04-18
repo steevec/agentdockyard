@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'">
+  <title>AgentDockyard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- Header -->
+  <div id="header">
+    <span style="font-size:16px">&#x2699;&#xFE0F;</span>
+    <h1>AgentDockyard</h1>
+    <span id="task-count"></span>
+    <span class="spacer"></span>
+    <span id="db-path-display" title=""></span>
+    <div id="refresh-dot" title="Auto-refresh 30s"></div>
+    <button id="btn-theme"    class="btn-header-icon" title="Changer de theme">&#x1F319;</button>
+    <button id="btn-settings" class="btn-header-icon" title="Parametres">&#x2699;&#xFE0F;</button>
+    <button id="btn-guide"    class="btn-header-icon" title="Guide d'utilisation & prompt IA">&#x1F4D6;</button>
+    <button id="btn-refresh"  title="Actualiser (F5)">&#x21BB;</button>
+    <button id="btn-add-toggle">+ Nouvelle tache</button>
+  </div>
+
+  <!-- Corps -->
+  <div id="main">
+    <div id="tasks-panel">
+      <div id="tasks-container">
+        <div id="empty-state"><div class="icon">&#x23F3;</div><div>Chargement...</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Barre ajout rapide en bas -->
+  <div id="add-bar">
+    <form id="add-form">
+
+      <div class="form-group">
+        <label>Agent</label>
+        <select id="f-agent" name="agent"></select>
+      </div>
+
+      <div class="form-group">
+        <label>Repo</label>
+        <input type="text" id="f-repo" name="repo" placeholder="Dev, Cowork..." autocomplete="off">
+      </div>
+
+      <div class="form-group">
+        <label>Statut</label>
+        <select id="f-statut" name="statut">
+          <option value="en_cours">En cours</option>
+          <option value="a_faire_rapidement">&#x1F534; Urgent</option>
+          <option value="en_attente">En attente</option>
+          <option value="bloque">Bloque</option>
+          <option value="annule">Annule</option>
+        </select>
+      </div>
+
+      <div class="form-group" style="align-self:end">
+        <button type="submit" class="btn-primary">Ajouter</button>
+      </div>
+
+      <div class="form-group add-form-2">
+        <label>Sujet <span style="color:var(--danger)">*</span></label>
+        <input type="text" id="f-sujet" name="sujet" placeholder="Description courte et claire..." required autocomplete="off">
+      </div>
+
+      <div class="form-group add-form-2">
+        <label>Contexte</label>
+        <input type="text" id="f-contexte" name="contexte" placeholder="Origine / raison..." maxlength="255" autocomplete="off">
+      </div>
+
+      <div class="form-group add-form-wide">
+        <label>Note / Plan d'action</label>
+        <textarea id="f-note" name="note" rows="2" placeholder="OBJECTIF : ...  |  PLAN : 1. ...  2. ..."></textarea>
+      </div>
+
+    </form>
+  </div>
+
+</div><!-- #app -->
+
+<!-- Modal edition -->
+<div id="modal-overlay">
+  <div id="modal">
+    <div id="modal-header">
+      <span id="modal-title">Modifier la tache</span>
+      <button id="modal-close">&times;</button>
+    </div>
+    <div id="modal-body">
+      <div class="form-group">
+        <label>Agent</label>
+        <select id="m-agent"></select>
+      </div>
+      <div class="form-group">
+        <label>Repo</label>
+        <input type="text" id="m-repo" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label>Sujet</label>
+        <textarea id="m-sujet" rows="2"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Statut</label>
+        <select id="m-statut">
+          <option value="en_cours">En cours</option>
+          <option value="a_faire_rapidement">&#x1F534; Urgent</option>
+          <option value="en_attente">En attente</option>
+          <option value="bloque">Bloque</option>
+          <option value="annule">Annule</option>
+          <option value="fait">&#x2705; Fait</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Contexte</label>
+        <input type="text" id="m-contexte" maxlength="255" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label>Note</label>
+        <textarea id="m-note" rows="10"></textarea>
+      </div>
+    </div>
+    <div id="modal-footer">
+      <button class="btn-secondary" id="modal-cancel">Annuler</button>
+      <button class="btn-save" id="modal-save">&#x1F4BE; Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Panneau Parametres -->
+<div class="side-panel-overlay" id="settings-overlay">
+  <div class="side-panel" id="settings-panel">
+    <div class="side-panel-header">
+      <h2>&#x2699;&#xFE0F; Parametres</h2>
+      <button class="side-panel-close" id="settings-close">&times;</button>
+    </div>
+    <div class="side-panel-body">
+
+      <div class="settings-section">
+        <h3>Apparence</h3>
+        <label>Theme</label>
+        <div class="radio-group">
+          <label><input type="radio" name="theme" value="dark"> &#x1F319; Dark</label>
+          <label><input type="radio" name="theme" value="light"> &#x2600;&#xFE0F; Light (beige)</label>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>Purge automatique</h3>
+        <label class="toggle-row">
+          <span>Activer la purge automatique (90j par defaut)</span>
+          <input type="checkbox" id="cfg-purge-enabled">
+        </label>
+        <label>Delai purge taches "fait" (jours)
+          <input type="number" id="cfg-purge-fait" min="1" max="365">
+        </label>
+        <label>Delai purge taches "annule" (jours)
+          <input type="number" id="cfg-purge-annule" min="1" max="365">
+        </label>
+        <label class="toggle-row">
+          <span>Purger aussi au demarrage</span>
+          <input type="checkbox" id="cfg-purge-demarrage">
+        </label>
+        <button id="btn-purge-now" class="btn-danger">&#x1F5D1;&#xFE0F; Purger maintenant</button>
+      </div>
+
+      <div class="settings-section">
+        <h3>Reclamations</h3>
+        <label>Expiration automatique des reclamations (heures)
+          <input type="number" id="cfg-reclam-heures" min="1" max="168">
+        </label>
+      </div>
+
+      <div class="settings-section">
+        <h3>Interface</h3>
+        <label>Intervalle de refresh (secondes)
+          <input type="number" id="cfg-refresh" min="5" max="300">
+        </label>
+        <label class="toggle-row">
+          <span>Afficher les taches "fait"</span>
+          <input type="checkbox" id="cfg-show-fait">
+        </label>
+        <label class="toggle-row">
+          <span>Afficher les taches "annule"</span>
+          <input type="checkbox" id="cfg-show-annule">
+        </label>
+        <label>Nb max de taches par groupe (0 = illimite)
+          <input type="number" id="cfg-max-groupe" min="0">
+        </label>
+      </div>
+
+      <div class="settings-section">
+        <h3>Position &amp; taille de la fenetre</h3>
+        <label class="toggle-row">
+          <span>Memoriser position/taille automatiquement</span>
+          <input type="checkbox" id="cfg-win-auto-remember">
+        </label>
+        <div id="cfg-win-manual" class="subsection">
+          <p class="hint">Ou definissez manuellement :</p>
+          <label>Ecran cible
+            <select id="cfg-win-display"></select>
+          </label>
+          <div class="form-row">
+            <label>Position X (px)
+              <input type="number" id="cfg-win-x">
+            </label>
+            <label>Position Y (px)
+              <input type="number" id="cfg-win-y">
+            </label>
+          </div>
+          <div class="form-row">
+            <label>Largeur (px)
+              <input type="number" id="cfg-win-w" min="200">
+            </label>
+            <label>Hauteur (px)
+              <input type="number" id="cfg-win-h" min="200">
+            </label>
+          </div>
+          <label class="toggle-row">
+            <span>Largeur = largeur totale de l'ecran cible</span>
+            <input type="checkbox" id="cfg-win-fullwidth">
+          </label>
+          <label class="toggle-row">
+            <span>Hauteur = hauteur totale de l'ecran cible</span>
+            <input type="checkbox" id="cfg-win-fullheight">
+          </label>
+          <label class="toggle-row">
+            <span>Activer la configuration manuelle</span>
+            <input type="checkbox" id="cfg-win-enabled">
+          </label>
+          <div id="cfg-win-screens-info" class="screens-info"></div>
+          <button id="btn-win-detect"       class="btn-secondary">&#x1F5A5;&#xFE0F; Detecter mes ecrans</button>
+          <button id="btn-win-save-current" class="btn-secondary">&#x1F4CC; Sauvegarder la position actuelle</button>
+          <button id="btn-win-apply-now"    class="btn-secondary">&#x25B6; Appliquer maintenant</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>Agents connus</h3>
+        <div class="agents-list" id="cfg-agents-list"></div>
+        <button id="btn-add-agent" class="btn-secondary">+ Ajouter un agent</button>
+      </div>
+
+      <div class="settings-section">
+        <h3>Base de donnees</h3>
+        <div class="path-display" id="cfg-db-path"></div>
+        <button id="btn-open-folder" class="btn-secondary">&#x1F4C2; Ouvrir le dossier</button>
+        <button id="btn-export-json" class="btn-secondary">&#x1F4BE; Exporter en JSON</button>
+      </div>
+
+      <div class="settings-section">
+        <h3>A propos</h3>
+        <p><strong>AgentDockyard</strong> v<span id="cfg-version">?</span></p>
+        <p>Par <a href="#" id="link-sitecrea" style="color:var(--accent)">Steeve Cordier &mdash; sitecrea.fr</a></p>
+        <p style="font-size:11px;color:var(--text-muted);margin-top:6px">Licence MIT &mdash; code source&nbsp;:
+          <a href="#" id="link-github" style="color:var(--accent)">github.com/steevec/agentdockyard</a>
+        </p>
+        <button id="btn-check-updates" class="btn-secondary" style="margin-top:10px">&#x1F504; Verifier les mises a jour</button>
+      </div>
+
+    </div>
+    <div class="side-panel-footer">
+      <button id="settings-cancel" class="btn-secondary">Fermer</button>
+      <button id="settings-save"   class="btn-primary">&#x2705; Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Panneau Guide -->
+<div class="side-panel-overlay" id="guide-overlay">
+  <div class="side-panel" id="guide-panel">
+    <div class="side-panel-header">
+      <h2>&#x1F4D6; Guide</h2>
+      <button class="side-panel-close" id="guide-close">&times;</button>
+    </div>
+    <div class="side-panel-body">
+
+      <div class="tabs">
+        <button class="tab active" data-tab="tab-usage">Utilisation</button>
+        <button class="tab"        data-tab="tab-prompt">Prompt IA</button>
+      </div>
+
+      <!-- Onglet Utilisation -->
+      <div class="tab-panel active" id="tab-usage">
+        <div class="guide-section">
+          <h4>Statuts des taches</h4>
+          <table class="guide-table">
+            <thead><tr><th>Statut</th><th>Utilisation</th></tr></thead>
+            <tbody>
+              <tr><td><span class="task-statut-badge badge-a_faire_rapidement">Urgent</span></td><td>Tache prioritaire a traiter rapidement</td></tr>
+              <tr><td><span class="task-statut-badge badge-en_cours">En cours</span></td><td>Tache en cours d'execution par un agent</td></tr>
+              <tr><td><span class="task-statut-badge badge-bloque">Bloque</span></td><td>Tache arretee, attend une action ou info</td></tr>
+              <tr><td><span class="task-statut-badge badge-en_attente">En attente</span></td><td>Differe volontairement, pas encore pret a traiter</td></tr>
+              <tr><td><span class="task-statut-badge badge-fait">Fait</span></td><td>Tache cloturee avec compte-rendu</td></tr>
+              <tr><td><span class="task-statut-badge badge-annule">Annule</span></td><td>Tache abandonnee, sans compte-rendu</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="guide-section">
+          <h4>Reclamations</h4>
+          <p>Un agent peut <em>reclamer</em> une tache pour indiquer qu'il la traite actuellement. Cela evite que deux agents travaillent sur la meme tache en parallele. Les reclamations expirent automatiquement apres 24h (configurable).</p>
+        </div>
+
+        <div class="guide-section">
+          <h4>Raccourcis clavier</h4>
+          <ul>
+            <li><kbd>F5</kbd> : rafraichir la liste des taches</li>
+            <li><kbd>Echap</kbd> : fermer la modale ou un panneau ouvert</li>
+          </ul>
+        </div>
+
+        <div class="guide-section">
+          <h4>Refresh automatique</h4>
+          <p>Les taches sont mises a jour automatiquement toutes les 30 secondes (configurable). De plus, l'application surveille le fichier <code>tasks.db</code> et rafraichit instantanement des qu'un agent externe ecrit dedans.</p>
+        </div>
+      </div>
+
+      <!-- Onglet Prompt IA -->
+      <div class="tab-panel" id="tab-prompt">
+        <p style="font-size:12px;color:var(--text-dim);margin-bottom:14px">
+          Ces instructions expliquent a vos agents IA comment declarer et suivre leurs taches dans AgentDockyard.
+          Copiez le bloc adapte a votre agent et collez-le dans son CLAUDE.md / prompt system.
+        </p>
+
+        <div class="guide-block">
+          <h4>&#x1F4C1; Chemin du script AgentDockyard</h4>
+          <div class="guide-sub">Chemin detecte automatiquement pour votre installation&nbsp;:</div>
+          <div class="guide-code" id="guide-agent-path">chargement...</div>
+          <button class="btn-copy" data-copy-from="guide-agent-path">&#x1F4CB; Copier le chemin</button>
+        </div>
+
+        <div class="guide-block">
+          <h4>&#x1F916; Claude Code</h4>
+          <div class="guide-sub">A ajouter dans votre <code>CLAUDE.md</code> :</div>
+          <div class="guide-code" id="guide-claude-code"></div>
+          <button class="btn-copy" data-copy-from="guide-claude-code">&#x1F4CB; Copier</button>
+        </div>
+
+        <div class="guide-block">
+          <h4>&#x2699;&#xFE0F; Claude Cowork</h4>
+          <div class="guide-sub">Version pour Claude Cowork (Linux / VirtioFS) :</div>
+          <div class="guide-code" id="guide-claude-cowork"></div>
+          <button class="btn-copy" data-copy-from="guide-claude-cowork">&#x1F4CB; Copier</button>
+        </div>
+
+        <div class="guide-block">
+          <h4>&#x2708;&#xFE0F; Autres agents (Copilot, Codex, ...)</h4>
+          <div class="guide-sub">Version generique &mdash; remplacez <code>NOM-DE-TON-AGENT</code> par l'identifiant de votre agent :</div>
+          <div class="guide-code" id="guide-generic"></div>
+          <button class="btn-copy" data-copy-from="guide-generic">&#x1F4CB; Copier</button>
+        </div>
+
+        <div class="guide-block">
+          <h4>&#x1F4CB; Toutes les commandes disponibles</h4>
+          <table class="guide-table">
+            <thead><tr><th>Action</th><th>Description</th><th>Champs requis</th></tr></thead>
+            <tbody>
+              <tr><td>ajouter</td>           <td>Creer une nouvelle tache</td>              <td>agent, sujet</td></tr>
+              <tr><td>modifier</td>          <td>Modifier les champs d'une tache</td>       <td>id</td></tr>
+              <tr><td>cloturer</td>          <td>Marquer comme fait + date_cloture</td>     <td>id</td></tr>
+              <tr><td>annuler</td>           <td>Supprimer la tache</td>                    <td>id</td></tr>
+              <tr><td>changer_statut</td>    <td>Changer le statut</td>                     <td>id, statut</td></tr>
+              <tr><td>reclamer</td>          <td>Verrouiller pour un agent</td>             <td>id, agent</td></tr>
+              <tr><td>liberer</td>           <td>Liberer la reclamation</td>                <td>id</td></tr>
+              <tr><td>lister</td>            <td>Lister toutes les taches</td>              <td>&mdash;</td></tr>
+              <tr><td>lister_par_agent</td>  <td>Filtrer par agent</td>                     <td>agent</td></tr>
+              <tr><td>lister_par_repo</td>   <td>Filtrer par repo</td>                      <td>repo</td></tr>
+              <tr><td>recuperer</td>         <td>Recuperer une tache par id</td>            <td>id</td></tr>
+              <tr><td>compter</td>           <td>Compter avec filtres optionnels</td>       <td>&mdash;</td></tr>
+              <tr><td>purger_maintenant</td> <td>Vider les taches fait/annule</td>          <td>&mdash;</td></tr>
+              <tr><td>exporter_json</td>     <td>Exporter toutes les taches</td>            <td>&mdash;</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="renderer.js"></script>
+</body>
+</html>

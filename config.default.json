@@ -1,0 +1,39 @@
+{
+  "theme": "dark",
+  "purge": {
+    "enabled": true,
+    "delai_fait_jours": 90,
+    "delai_annule_jours": 90,
+    "au_demarrage": false
+  },
+  "reclamation": {
+    "expiration_heures": 24
+  },
+  "interface": {
+    "refresh_secondes": 30,
+    "afficher_fait": true,
+    "afficher_annule": false,
+    "max_par_groupe": 0
+  },
+  "agents": [
+    { "id": "claude-cowork", "label": "claude-cowork", "emoji": "\u2699\uFE0F" },
+    { "id": "claude-code",   "label": "claude-code",   "emoji": "\uD83E\uDD16" },
+    { "id": "copilot",       "label": "copilot",       "emoji": "\u2708\uFE0F" },
+    { "id": "codex",         "label": "codex",         "emoji": "\uD83D\uDCDF" },
+    { "id": "steeve",        "label": "steeve",        "emoji": "\uD83D\uDC64" }
+  ],
+  "window": {
+    "enabled": false,
+    "autoRemember": false,
+    "displayIndex": 0,
+    "displayId": null,
+    "x": null,
+    "y": null,
+    "xRelative": false,
+    "yRelative": false,
+    "width": 1200,
+    "height": 900,
+    "fullWidth": false,
+    "fullHeight": false
+  }
+}

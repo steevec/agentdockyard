@@ -1,0 +1,99 @@
+{
+  "name": "agentdockyard",
+  "productName": "AgentDockyard",
+  "version": "1.0.0",
+  "description": "Superviseur de taches pour agents IA - Claude Code, Cowork, Copilot, Codex",
+  "main": "main.js",
+  "author": {
+    "name": "Steeve Cordier",
+    "email": "steeve.cordier@gmail.com",
+    "url": "https://sitecrea.fr/"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/steevec/agentdockyard",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/steevec/agentdockyard.git"
+  },
+  "bugs": {
+    "url": "https://github.com/steevec/agentdockyard/issues"
+  },
+  "scripts": {
+    "start": "electron .",
+    "build:agent": "node scripts/build-agent.js",
+    "build": "npm run build:agent && electron-builder --win",
+    "build:portable": "npm run build:agent && electron-builder --win portable",
+    "build:nsis": "npm run build:agent && electron-builder --win nsis",
+    "publish": "npm run build:agent && electron-builder --win --publish always",
+    "dist": "npm run build"
+  },
+  "build": {
+    "appId": "fr.sitecrea.agentdockyard",
+    "productName": "AgentDockyard",
+    "copyright": "Copyright (c) Steeve Cordier - https://sitecrea.fr/",
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer.js",
+      "index.html",
+      "style.css",
+      "config.default.json",
+      "package.json",
+      "assets/icon.ico",
+      "assets/icon.png",
+      "!**/*.map",
+      "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
+      "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
+      "!**/node_modules/.bin",
+      "!**/*.{iml,o,hprof,orig,pyc,pyo,rbc,swp,csproj,sln,xproj}"
+    ],
+    "extraResources": [
+      {
+        "from": "dist-agent/agent.exe",
+        "to": "agent.exe"
+      },
+      {
+        "from": "agent.py",
+        "to": "agent.py"
+      }
+    ],
+    "win": {
+      "target": [
+        { "target": "nsis",     "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "icon": "assets/icon.ico",
+      "artifactName": "AgentDockyard-${version}-${arch}-${os}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "AgentDockyard",
+      "installerLanguages": ["fr_FR", "en_US"],
+      "language": "1036",
+      "artifactName": "AgentDockyard-Setup-${version}.${ext}",
+      "deleteAppDataOnUninstall": false
+    },
+    "portable": {
+      "artifactName": "AgentDockyard-Portable-${version}.${ext}"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "steevec",
+      "repo": "agentdockyard"
+    }
+  },
+  "devDependencies": {
+    "electron": "^29.1.0",
+    "electron-builder": "^24.13.3"
+  },
+  "dependencies": {
+    "electron-updater": "^6.1.8"
+  }
+}
