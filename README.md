@@ -204,7 +204,7 @@ The full command reference lives in the app guide and in [`agent.py`](agent.py).
 
 | Value | Meaning |
 |---|---|
-| `urgent` | Needs attention first |
+| `a_faire_rapidement` | Needs attention first (shown as `Urgent` in the UI) |
 | `en_cours` | Currently being worked on |
 | `en_attente` | Waiting for another task, input, or timing |
 | `bloque` | Blocked |
