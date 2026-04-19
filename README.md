@@ -12,12 +12,12 @@
 
 AgentDockyard helps you keep track of what your AI agents are doing **without reopening every session**.
 
-It works when you have **many different agents** working together, but also when you have **just one agent spread across many sessions**.  
+It works when you have **many different agents** working together, but also when you have **just one agent spread across many sessions**.
 You can immediately see what is **in progress**, **blocked**, **waiting**, **done**, and **who claimed what**.
 
 Install the app, copy the prompt snippet shown in the built-in guide, paste it into your agent memory, and you're done. After that, your agents can create, update, claim, delegate, and close tasks on their own.
 
-> Local-first. No cloud dashboard. No account. No telemetry.  
+> Local-first. No cloud dashboard. No account. No telemetry.
 > By [Steeve Cordier](https://sitecrea.fr/) — MIT License.
 
 ---
@@ -28,7 +28,7 @@ Install the app, copy the prompt snippet shown in the built-in guide, paste it i
 
 ## Why this exists
 
-When you run several AI sessions in parallel, the real problem is not generating code.  
+When you run several AI sessions in parallel, the real problem is not generating code.
 It is **remembering the state of the work**.
 
 Questions pile up fast:
@@ -72,12 +72,12 @@ That is the whole idea: **minimal setup, then autonomous tracking**.
 
 Most task tools assume a team.
 
-AgentDockyard also makes sense when you are alone but running the same agent in multiple terminals, branches, or scheduled sessions.  
+AgentDockyard also makes sense when you are alone but running the same agent in multiple terminals, branches, or scheduled sessions.
 Instead of reopening each conversation to remember what was happening, you get one consolidated view.
 
 ### Agents can coordinate through it
 
-One agent can create or dispatch a batch of tasks.  
+One agent can create or dispatch a batch of tasks.
 Another agent can pick up a waiting task, update progress, add notes, or close it.
 
 That makes AgentDockyard useful not only as a personal dashboard, but as a **small local coordination layer between agents**.
@@ -99,27 +99,31 @@ The intended workflow is simple:
 
 ### 1) One agent, many sessions
 
-You have 6 Claude Code sessions open across multiple repos.  
-Each session creates and updates tasks as it works.  
+You have 6 Claude Code sessions open across multiple repos.
+Each session creates and updates tasks as it works.
 You keep one clean overview of what is still active, what is blocked, and what is already done.
 
 ### 2) One supervisor agent, several executor agents
 
-A planning or supervisor agent breaks down a migration into subtasks.  
-Other agents pick up the waiting items and move them forward.  
+A planning or supervisor agent breaks down a migration into subtasks.
+Other agents pick up the waiting items and move them forward.
 You can see delegation, claims, progress, and completion from one place.
 
 ### 3) Overnight or scheduled work
 
-A scheduled agent runs during the night or while you are away.  
+A scheduled agent runs during the night or while you are away.
 In the morning, you do not need to inspect logs or reopen sessions first: the dashboard already shows what was created, updated, blocked, or completed.
 
 ---
 
-## Screenshot
+## Screenshots
 
 <p align="center">
   <img src="docs/screenshots/agentdockyard-dark-overview.png" alt="AgentDockyard dark mode grouped by repo and agent" width="900">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/agentdockyard-light-overview.png" alt="AgentDockyard light mode grouped by repo and agent" width="900">
 </p>
 
 Dark and light themes are both available in the app.
@@ -158,7 +162,7 @@ The installer is currently **unsigned**, so Windows SmartScreen may ask for conf
 
 ### macOS / Linux
 
-Not packaged yet.  
+Not packaged yet.
 The desktop release flow currently targets Windows, but the underlying idea and CLI usage are not Windows-only.
 
 ---
@@ -167,7 +171,7 @@ The desktop release flow currently targets Windows, but the underlying idea and 
 
 Inside the app, open the **Guide** panel.
 
-You will find copy-ready instructions for integrating AgentDockyard with your agent memory or system prompt.  
+You will find copy-ready instructions for integrating AgentDockyard with your agent memory or system prompt.
 The app also exposes the path to the bundled executable so you do not have to guess it.
 
 Typical examples include:
@@ -216,7 +220,7 @@ Everything stays local.
 - **Config**: `%APPDATA%\AgentDockyard\config.json`
 - **Database**: `%APPDATA%\AgentDockyard\tasks.db`
 
-There is no hosted dashboard and no required account.  
+There is no hosted dashboard and no required account.
 Network access is only relevant for optional update checks against GitHub Releases.
 
 ---
@@ -228,17 +232,17 @@ Network access is only relevant for optional update checks against GitHub Releas
  │  Renderer (HTML/CSS/JS)        │
  │  theme, panels, task cards     │
  └──────────┬─────────────────────┘
-            │ IPC (preload bridge)
+			│ IPC (preload bridge)
  ┌──────────▼─────────────────────┐                        ┌──────────────────────┐
  │  Electron main (main.js)       │ ─── spawnSync ───────► │  agent.exe (bundled) │
  │  window, config, updater       │                        │  PyInstaller bundle  │
  └──────────┬─────────────────────┘                        └──────────┬───────────┘
-            │ fs.watch(tasks.db)                                       │
-            │                                                          ▼
-            └── notifies renderer on external write ───────────── tasks.db (SQLite)
-                                                                       ▲
-                                external AI agents call agent.exe  ────┘
-                                (Claude Code, Cowork, Copilot, ...)
+			│ fs.watch(tasks.db)                                       │
+			│                                                          ▼
+			└── notifies renderer on external write ───────────── tasks.db (SQLite)
+																	   ▲
+								external AI agents call agent.exe  ────┘
+								(Claude Code, Cowork, Copilot, ...)
 ```
 
 - **Electron renderer**: dashboard UI
@@ -279,29 +283,29 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for local development details.
 
 ## FAQ
 
-**Do I need Python installed to use the app?**  
+**Do I need Python installed to use the app?**
 No. End users use the bundled `agent.exe`. Python is only needed if you rebuild from source.
 
-**Is this only useful for teams of agents?**  
+**Is this only useful for teams of agents?**
 No. One of the main use cases is exactly the opposite: one developer, one main agent, many sessions.
 
-**Does it send data to the cloud?**  
+**Does it send data to the cloud?**
 No. Tasks and config stay local. Only update checks may contact GitHub Releases.
 
-**Can different kinds of agents use it?**  
+**Can different kinds of agents use it?**
 Yes. It is designed for mixed setups: Claude Code, Claude Cowork, Codex, Copilot, scripts, or scheduled jobs.
 
-**Can one agent create tasks for another?**  
+**Can one agent create tasks for another?**
 Yes. That is one of the intended workflows.
 
-**Why not just use a TODO app?**  
+**Why not just use a TODO app?**
 Because the point here is not generic project management. The point is giving AI agents a very small shared protocol so they can create, update, and close work items autonomously.
 
 ---
 
 ## Contributing
 
-Bug reports, ideas, and pull requests are welcome.  
+Bug reports, ideas, and pull requests are welcome.
 See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup and conventions.
 
 For security-sensitive topics, see [SECURITY.md](SECURITY.md).
