@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 _(nothing yet)_
 
+## [1.3.0] - 2026-04-19
+
+### Added
+- **Hourly backup history with preview & restore** — a new clock icon in the header opens a side panel listing every hourly snapshot of your tasks database. Backups are stored locally (one per hour, rotated after 7 days) and only taken while the app is running. Click any entry to open a read-only full-screen preview clearly marked with a thick orange border and a pulsing banner ("Backup preview — read only"), so you always know whether you're looking at live data or an archive. A "Replace current state" button swaps in the selected backup and automatically saves a safety copy of your current state first, so a mistaken restore can be reverted from the same history list.
+
 ## [1.2.0] - 2026-04-19
 
 ### Added

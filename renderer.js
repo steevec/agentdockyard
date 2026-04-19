@@ -69,16 +69,17 @@ function updateStatusSelectOptions(selectId, includeFait) {
 }
 
 // ─── Etat ─────────────────────────────────────────────────────────────────────
-let currentTasks   = [];
-let currentConfig  = null;
-let agentsConfig   = [];
-let collapsedRepos = new Set(JSON.parse(localStorage.getItem('collapsedRepos') || '[]'));
-let visibleFaites  = new Set();
-let openNotes      = new Set();
-let openDropdowns  = new Set();
-let editingTaskId  = null;
-let refreshTimer   = null;
-let addBarOpen     = false;
+let currentTasks     = [];
+let currentConfig    = null;
+let agentsConfig     = [];
+let collapsedRepos   = new Set(JSON.parse(localStorage.getItem('collapsedRepos') || '[]'));
+let visibleFaites    = new Set();
+let openNotes        = new Set();
+let openDropdowns    = new Set();
+let editingTaskId    = null;
+let refreshTimer     = null;
+let addBarOpen       = false;
+let previewFilename  = null;  // snapshot en cours d'apercu (null = pas en mode preview)
 
 // ─── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
@@ -98,6 +99,8 @@ async function init() {
   bindModal();
   bindSettingsPanel();
   bindGuidePanel();
+  bindSnapshotsPanel();
+  bindPreviewOverlay();
   bindAddForm();
 
   await refreshTasks();
@@ -125,7 +128,14 @@ async function init() {
 
   document.addEventListener('keydown', e => {
     if (e.key === 'F5')     { e.preventDefault(); refreshTasks(); }
-    if (e.key === 'Escape') { closeModal(); closeAllDropdowns(); closeSidePanel('settings-overlay'); closeSidePanel('guide-overlay'); }
+    if (e.key === 'Escape') {
+      closeModal();
+      closeAllDropdowns();
+      closeSidePanel('settings-overlay');
+      closeSidePanel('guide-overlay');
+      closeSidePanel('snapshots-overlay');
+      if (previewFilename) closePreview();
+    }
   });
   document.addEventListener('click', e => {
     if (!e.target.closest('.statut-wrapper')) closeAllDropdowns();
@@ -164,15 +174,19 @@ async function toggleTheme() {
 
 // ─── Header buttons ───────────────────────────────────────────────────────────
 function bindHeaderButtons() {
-  document.getElementById('btn-theme').addEventListener('click',    toggleTheme);
-  document.getElementById('btn-refresh').addEventListener('click',  refreshTasks);
+  document.getElementById('btn-theme').addEventListener('click',      toggleTheme);
+  document.getElementById('btn-refresh').addEventListener('click',    refreshTasks);
   document.getElementById('btn-add-toggle').addEventListener('click', toggleAddBar);
-  document.getElementById('btn-settings').addEventListener('click', openSettingsPanel);
-  document.getElementById('btn-guide').addEventListener('click',    openGuidePanel);
+  document.getElementById('btn-settings').addEventListener('click',   openSettingsPanel);
+  document.getElementById('btn-guide').addEventListener('click',      openGuidePanel);
+  document.getElementById('btn-snapshots').addEventListener('click',  openSnapshotsPanel);
 }
 
 // ─── Refresh & rendu ──────────────────────────────────────────────────────────
 async function refreshTasks() {
+  // Pendant une preview de snapshot, on gele l'affichage live pour ne pas perturber
+  // les IDs DOM partages (le preview utilise le meme generateur de cartes).
+  if (previewFilename) { resetRefreshTimer(); return; }
   showDot(true);
   try {
     const r = await window.taskAPI.getTasks();
@@ -201,34 +215,27 @@ function toggleAddBar() {
   if (addBarOpen) setTimeout(() => document.getElementById('f-sujet').focus(), 320);
 }
 
-function renderTasks(tasks) {
-  const container = document.getElementById('tasks-container');
-  const cfgIf = (currentConfig && currentConfig.interface) || {};
-  const showFait   = cfgIf.afficher_fait   !== false;
-  const showAnnule = cfgIf.afficher_annule === true;
-  const maxPerGrp  = Math.max(0, cfgIf.max_par_groupe || 0);
-
+function buildTasksHtml(tasks, opts) {
   const visibleTasks = tasks.filter(t => {
-    if (t.statut === 'annule' && !showAnnule) return false;
+    if (t.statut === 'annule' && !opts.showAnnule) return false;
     return true;
   });
 
   if (!visibleTasks.length) {
-    container.innerHTML = `<div id="empty-state"><div class="icon">\u2705</div><div>${esc(t('empty_no_tasks'))}</div></div>`;
-    return;
+    return `<div id="empty-state"><div class="icon">\u2705</div><div>${esc(t('empty_no_tasks'))}</div></div>`;
   }
 
   const groupes = {};
-  for (const t of visibleTasks) {
-    const repo  = t.repo  || '_hors_repo_';
-    const agent = t.agent || 'inconnu';
+  for (const tk of visibleTasks) {
+    const repo  = tk.repo  || '_hors_repo_';
+    const agent = tk.agent || 'inconnu';
     if (!groupes[repo])        groupes[repo]       = {};
     if (!groupes[repo][agent]) groupes[repo][agent] = [];
-    groupes[repo][agent].push(t);
+    groupes[repo][agent].push(tk);
   }
 
   function repoActif(repo) {
-    return Object.values(groupes[repo]).flat().some(t => t.statut !== 'fait' && t.statut !== 'annule');
+    return Object.values(groupes[repo]).flat().some(tk => tk.statut !== 'fait' && tk.statut !== 'annule');
   }
   const repoKeys = Object.keys(groupes).sort((a, b) => {
     if (a === '_hors_repo_') return 1;
@@ -238,17 +245,26 @@ function renderTasks(tasks) {
     return a.localeCompare(b);
   });
 
-  container.innerHTML = repoKeys.map(r => renderRepoGroup(r, groupes[r], { showFait, maxPerGrp })).join('');
+  return repoKeys.map(r => renderRepoGroup(r, groupes[r], { showFait: opts.showFait, maxPerGrp: opts.maxPerGrp })).join('');
+}
 
-  const closedIds = new Set(visibleTasks.filter(t => t.statut === 'fait' || t.statut === 'annule').map(t => t.id));
-  // Restore open notes
+function renderTasks(tasks) {
+  const container = document.getElementById('tasks-container');
+  const cfgIf = (currentConfig && currentConfig.interface) || {};
+  const showFait   = cfgIf.afficher_fait   !== false;
+  const showAnnule = cfgIf.afficher_annule === true;
+  const maxPerGrp  = Math.max(0, cfgIf.max_par_groupe || 0);
+
+  container.innerHTML = buildTasksHtml(tasks, { showFait, showAnnule, maxPerGrp });
+
+  const visibleTasks = tasks.filter(tk => tk.statut !== 'annule' || showAnnule);
+  const closedIds    = new Set(visibleTasks.filter(tk => tk.statut === 'fait' || tk.statut === 'annule').map(tk => tk.id));
   for (const id of [...openNotes]) {
     if (closedIds.has(id)) { openNotes.delete(id); continue; }
     const el  = document.getElementById(`note-${id}`);
     const btn = el && el.previousElementSibling;
     if (el) { el.classList.add('visible'); if (btn) btn.textContent = t('task_note_hide'); }
   }
-  // Restore open status dropdowns
   for (const id of [...openDropdowns]) {
     const dd = document.getElementById(`dd-${id}`);
     if (dd) dd.classList.add('open'); else openDropdowns.delete(id);
@@ -852,6 +868,128 @@ en_cours | a_faire_rapidement | en_attente | bloque | fait | annule
   );
 }
 
+// ─── Snapshots horaires ───────────────────────────────────────────────────────
+function bindSnapshotsPanel() {
+  const overlay = document.getElementById('snapshots-overlay');
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeSidePanel('snapshots-overlay'); });
+  document.getElementById('snapshots-close').addEventListener('click', () => closeSidePanel('snapshots-overlay'));
+}
+
+async function openSnapshotsPanel() {
+  const snapshots = await window.taskAPI.listSnapshots();
+  renderSnapshotsList(snapshots || []);
+  openSidePanel('snapshots-overlay');
+}
+
+function renderSnapshotsList(snapshots) {
+  const container = document.getElementById('snapshots-list');
+  if (!snapshots.length) {
+    container.innerHTML = `<div class="snapshots-empty">
+      <div class="icon">\u{1F550}</div>
+      <div>${esc(t('snapshots_empty_1'))}</div>
+      <div style="margin-top:6px;font-size:11px;opacity:.8">${esc(t('snapshots_empty_2'))}</div>
+    </div>`;
+    return;
+  }
+
+  // Regrouper par jour (YYYYMMDD) en conservant l'ordre (plus recent en premier)
+  const byDay = new Map();  // key = YYYYMMDD, value = array
+  for (const s of snapshots) {
+    const d = new Date(s.timestamp);
+    const key = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+    if (!byDay.has(key)) byDay.set(key, []);
+    byDay.get(key).push(s);
+  }
+
+  const today     = dayKey(new Date());
+  const yesterday = dayKey(new Date(Date.now() - 86400000));
+
+  let h = '';
+  for (const [key, list] of byDay) {
+    let label;
+    if (key === today)     label = t('snapshots_today');
+    else if (key === yesterday) label = t('snapshots_yesterday');
+    else {
+      label = `${key.slice(6,8)}/${key.slice(4,6)}/${key.slice(0,4)}`;
+    }
+    h += `<div class="snapshots-day">`;
+    h += `<div class="snapshots-day-header">${esc(label)}</div>`;
+    for (const s of list) {
+      const d = new Date(s.timestamp);
+      const hh = String(d.getHours()).padStart(2,'0');
+      const mm = String(d.getMinutes()).padStart(2,'0');
+      const kb = Math.round((s.size || 0) / 1024);
+      const badge = s.beforeRestore ? `<span class="snapshot-badge-restore">${esc(t('snapshots_badge_before_restore'))}</span>` : '';
+      h += `<div class="snapshot-item${s.beforeRestore ? ' before-restore' : ''}" onclick='openPreview(${j(s.filename)})'>`;
+      h += `<span class="snapshot-item-time">${hh}:${mm}</span>`;
+      h += `<span class="snapshot-item-meta">${badge}</span>`;
+      h += `<span class="snapshot-item-size">${kb} Ko</span>`;
+      h += `</div>`;
+    }
+    h += `</div>`;
+  }
+  container.innerHTML = h;
+}
+
+function dayKey(d) {
+  return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function bindPreviewOverlay() {
+  document.getElementById('preview-close-btn').addEventListener('click',   closePreview);
+  document.getElementById('preview-restore-btn').addEventListener('click', confirmRestore);
+}
+
+async function openPreview(filename) {
+  closeSidePanel('snapshots-overlay');
+  const r = await window.taskAPI.previewSnapshot(filename);
+  if (!r || !r.ok) {
+    showToast(t('snapshots_preview_error') + (r && r.error ? ' : ' + r.error : ''), 'error');
+    return;
+  }
+  previewFilename = filename;
+  const d = new Date(r.timestamp);
+  const hh = String(d.getHours()).padStart(2,'0');
+  const mm = String(d.getMinutes()).padStart(2,'0');
+  const dateLabel = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()} ${hh}h${mm}`;
+  const subKey = r.beforeRestore ? 'preview_banner_sub_before_restore' : 'preview_banner_sub';
+  document.getElementById('preview-banner-sub').textContent = t(subKey).replace('DATE', dateLabel);
+
+  const body = document.getElementById('preview-tasks-container');
+  body.innerHTML = buildTasksHtml(r.taches || [], { showFait: true, showAnnule: true, maxPerGrp: 0 });
+
+  // Badge "preview" sur chaque carte pour renforcer le signal visuel
+  body.querySelectorAll('.task-card').forEach(card => {
+    const ribbon = document.createElement('div');
+    ribbon.className   = 'preview-ribbon';
+    ribbon.textContent = t('preview_ribbon');
+    card.appendChild(ribbon);
+  });
+
+  document.getElementById('preview-overlay').classList.add('visible');
+}
+
+function closePreview() {
+  previewFilename = null;
+  document.getElementById('preview-overlay').classList.remove('visible');
+  document.getElementById('preview-tasks-container').innerHTML = '';
+}
+
+async function confirmRestore() {
+  if (!previewFilename) return;
+  const d = new Date();  // juste pour le message
+  const msg = t('preview_restore_confirm');
+  if (!confirm(msg)) return;
+  const r = await window.taskAPI.restoreSnapshot(previewFilename);
+  if (r && r.ok) {
+    showToast(t('preview_restore_ok'), 'success');
+    closePreview();
+    await refreshTasks();
+  } else {
+    showToast(t('preview_restore_error') + (r && r.error ? ' : ' + r.error : ''), 'error');
+  }
+}
+
 // ─── Banniere mise a jour ─────────────────────────────────────────────────────
 function showUpdateBanner(msg, showInstall) {
   const banner = document.getElementById('update-banner');
@@ -901,5 +1039,6 @@ window.openEditModal   = openEditModal;
 window.doCloseTask     = doCloseTask;
 window.doDeleteTask    = doDeleteTask;
 window.doReleaseTask   = doReleaseTask;
+window.openPreview     = openPreview;
 
 document.addEventListener('DOMContentLoaded', init);

@@ -18,10 +18,11 @@
     <span class="spacer"></span>
     <span id="db-path-display" title=""></span>
     <div id="refresh-dot" title="Auto-refresh 30s"></div>
-    <button id="btn-theme"    class="btn-header-icon" title="Changer de theme">&#x1F319;</button>
-    <button id="btn-settings" class="btn-header-icon" title="Parametres">&#x2699;&#xFE0F;</button>
-    <button id="btn-guide"    class="btn-header-icon" title="Guide d'utilisation & prompt IA">&#x1F4D6;</button>
-    <button id="btn-refresh"  title="Actualiser (F5)">&#x21BB;</button>
+    <button id="btn-theme"     class="btn-header-icon" title="Changer de theme">&#x1F319;</button>
+    <button id="btn-snapshots" class="btn-header-icon" title="Historique des sauvegardes">&#x1F550;</button>
+    <button id="btn-settings"  class="btn-header-icon" title="Parametres">&#x2699;&#xFE0F;</button>
+    <button id="btn-guide"     class="btn-header-icon" title="Guide d'utilisation & prompt IA">&#x1F4D6;</button>
+    <button id="btn-refresh"   title="Actualiser (F5)">&#x21BB;</button>
     <button id="btn-add-toggle">+ Nouvelle tache</button>
   </div>
 
@@ -372,6 +373,39 @@
       </div>
 
     </div>
+  </div>
+</div>
+
+<!-- Panneau lateral - Historique des sauvegardes -->
+<div class="side-panel-overlay" id="snapshots-overlay">
+  <div class="side-panel" id="snapshots-panel">
+    <div class="side-panel-header">
+      <h2>&#x1F550; <span data-i18n="snapshots_title">Historique des sauvegardes</span></h2>
+      <button class="side-panel-close" id="snapshots-close">&times;</button>
+    </div>
+    <div class="side-panel-body">
+      <p class="snapshots-intro" data-i18n="snapshots_intro">
+        Les taches sont sauvegardees automatiquement toutes les heures.
+        Les sauvegardes de plus de 7 jours sont supprimees automatiquement.
+      </p>
+      <div id="snapshots-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Overlay - Preview plein ecran d'un snapshot -->
+<div id="preview-overlay">
+  <div id="preview-banner">
+    <span class="preview-banner-icon">&#x26A0;&#xFE0F;</span>
+    <div class="preview-banner-text">
+      <div class="preview-banner-title" data-i18n="preview_banner_title">APERCU D'UNE SAUVEGARDE</div>
+      <div class="preview-banner-sub" id="preview-banner-sub"></div>
+    </div>
+    <button id="preview-close-btn" class="btn-secondary" data-i18n="preview_close">Fermer l'apercu</button>
+    <button id="preview-restore-btn" class="btn-danger" data-i18n="preview_restore">Remplacer l'etat actuel</button>
+  </div>
+  <div id="preview-body">
+    <div id="preview-tasks-container"></div>
   </div>
 </div>
 

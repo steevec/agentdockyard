@@ -40,6 +40,11 @@ contextBridge.exposeInMainWorld('taskAPI', {
   getWindowBounds:   ()       => ipcRenderer.invoke('get-window-bounds'),
   applyWindowBounds: (bounds) => ipcRenderer.invoke('apply-window-bounds', bounds),
 
+  // ─── Snapshots horaires ─────────────────────────────────────────────────────
+  listSnapshots:    ()         => ipcRenderer.invoke('snapshot-list'),
+  previewSnapshot:  (filename) => ipcRenderer.invoke('snapshot-preview', filename),
+  restoreSnapshot:  (filename) => ipcRenderer.invoke('snapshot-restore', filename),
+
   // ─── Watcher externe ────────────────────────────────────────────────────────
   onDbChanged:  (cb) => ipcRenderer.on('db-changed', cb),
   offDbChanged: (cb) => ipcRenderer.removeListener('db-changed', cb),

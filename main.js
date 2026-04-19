@@ -62,9 +62,14 @@ const AGENT_SCRIPT_DEV = path.join(__dirname, 'agent.py');
 // AGENT_PATH : chemin a exposer aux agents IA pour leurs appels CLI
 const AGENT_PATH = IS_PACKAGED ? AGENT_EXE_PATH : AGENT_SCRIPT_DEV;
 
-const USER_DATA   = IS_PACKAGED ? app.getPath('userData') : __dirname;
-const DB_PATH     = path.join(USER_DATA, 'tasks.db');
-const CONFIG_PATH = path.join(USER_DATA, 'config.json');
+const USER_DATA     = IS_PACKAGED ? app.getPath('userData') : __dirname;
+const DB_PATH       = path.join(USER_DATA, 'tasks.db');
+const CONFIG_PATH   = path.join(USER_DATA, 'config.json');
+const SNAPSHOTS_DIR = path.join(USER_DATA, 'snapshots');
+
+const SNAPSHOT_INTERVAL_MS = 60 * 60 * 1000;  // 1h
+const SNAPSHOT_MAX_AGE_MS  = 7 * 24 * 60 * 60 * 1000;  // 7 jours
+const SNAPSHOT_MAX_COUNT   = 200;  // garde-fou dur : 168 horaires + marge pour les before-restore
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 const CONFIG_DEFAULT = {
@@ -157,16 +162,17 @@ function detectPython() {
 }
 
 // ─── Appel agent (async — ne bloque pas le main process ni la fenetre) ────────
-function callAgent(payload) {
+function callAgent(payload, dbPathOverride) {
   return new Promise((resolve) => {
+    const dbPath = dbPathOverride || DB_PATH;
     let bin, args;
     if (IS_PACKAGED) {
       bin  = AGENT_EXE_PATH;
-      args = [JSON.stringify(payload), DB_PATH];
+      args = [JSON.stringify(payload), dbPath];
     } else {
       if (!PYTHON_CMD) return resolve({ statut: 'NOK', message: 'Python introuvable (mode dev)' });
       bin  = PYTHON_CMD;
-      args = [AGENT_SCRIPT_DEV, JSON.stringify(payload), DB_PATH];
+      args = [AGENT_SCRIPT_DEV, JSON.stringify(payload), dbPath];
     }
 
     let stdout = '';
@@ -200,6 +206,157 @@ function callAgent(payload) {
       resolve({ statut: 'NOK', message: err.message });
     });
   });
+}
+
+// ─── Snapshots horaires ───────────────────────────────────────────────────────
+// Un snapshot = une copie binaire de tasks.db dans snapshots/.
+// Nom : snapshot-YYYYMMDD-HHmmss.db (+ suffix "-before-restore" pour les backups
+// automatiques crees avant un remplacement).
+// Rotation : snapshots de plus de 7 jours supprimes, avec un plafond dur a 200
+// fichiers (168 horaires + marge pour les backups before-restore).
+
+let snapshotTimer = null;
+
+function ensureSnapshotsDir() {
+  try { fs.mkdirSync(SNAPSHOTS_DIR, { recursive: true }); } catch (_) { /* ignore */ }
+}
+
+function snapshotStamp(d) {
+  const Y = d.getFullYear();
+  const M = String(d.getMonth() + 1).padStart(2, '0');
+  const D = String(d.getDate()).padStart(2, '0');
+  const h = String(d.getHours()).padStart(2, '0');
+  const m = String(d.getMinutes()).padStart(2, '0');
+  const s = String(d.getSeconds()).padStart(2, '0');
+  return `${Y}${M}${D}-${h}${m}${s}`;
+}
+
+function parseSnapshotName(filename) {
+  // snapshot-YYYYMMDD-HHmmss.db  ou  snapshot-YYYYMMDD-HHmmss-before-restore.db
+  const m = /^snapshot-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})(-before-restore)?\.db$/.exec(filename);
+  if (!m) return null;
+  const [_, Y, Mo, D, h, mi, s, suffix] = m;
+  const date = new Date(Number(Y), Number(Mo) - 1, Number(D), Number(h), Number(mi), Number(s));
+  if (isNaN(date.getTime())) return null;
+  return {
+    filename,
+    date,
+    timestamp:     date.getTime(),
+    beforeRestore: !!suffix,
+  };
+}
+
+function listSnapshotFiles() {
+  ensureSnapshotsDir();
+  let entries = [];
+  try { entries = fs.readdirSync(SNAPSHOTS_DIR); } catch (_) { return []; }
+  const out = [];
+  for (const f of entries) {
+    const meta = parseSnapshotName(f);
+    if (!meta) continue;
+    try {
+      const st = fs.statSync(path.join(SNAPSHOTS_DIR, f));
+      meta.size = st.size;
+    } catch (_) { meta.size = 0; }
+    out.push(meta);
+  }
+  out.sort((a, b) => b.timestamp - a.timestamp);  // plus recent en premier
+  return out;
+}
+
+function takeSnapshot(suffix) {
+  if (!fs.existsSync(DB_PATH)) return null;
+  ensureSnapshotsDir();
+  const stamp = snapshotStamp(new Date());
+  const name  = `snapshot-${stamp}${suffix ? '-' + suffix : ''}.db`;
+  const dest  = path.join(SNAPSHOTS_DIR, name);
+  try {
+    fs.copyFileSync(DB_PATH, dest);
+    return name;
+  } catch (e) {
+    console.error('[snapshot] copie echouee :', e.message);
+    return null;
+  }
+}
+
+function rotateSnapshots() {
+  const all = listSnapshotFiles();
+  const now = Date.now();
+  const tooOld = all.filter(s => (now - s.timestamp) > SNAPSHOT_MAX_AGE_MS);
+  for (const s of tooOld) {
+    try { fs.unlinkSync(path.join(SNAPSHOTS_DIR, s.filename)); } catch (_) { /* ignore */ }
+  }
+  // Plafond dur : si on depasse SNAPSHOT_MAX_COUNT, supprimer les plus anciens
+  const remaining = listSnapshotFiles();
+  if (remaining.length > SNAPSHOT_MAX_COUNT) {
+    const excess = remaining.slice(SNAPSHOT_MAX_COUNT);
+    for (const s of excess) {
+      try { fs.unlinkSync(path.join(SNAPSHOTS_DIR, s.filename)); } catch (_) { /* ignore */ }
+    }
+  }
+}
+
+function maybeTakeHourlySnapshot() {
+  const list = listSnapshotFiles().filter(s => !s.beforeRestore);
+  const last = list[0];  // plus recent
+  if (!last || (Date.now() - last.timestamp) >= SNAPSHOT_INTERVAL_MS) {
+    takeSnapshot();
+  }
+  rotateSnapshots();
+}
+
+function startSnapshotScheduler() {
+  // 1) Snapshot "initial" si aucune sauvegarde recente
+  try { maybeTakeHourlySnapshot(); } catch (e) { console.error('[snapshot] init :', e.message); }
+
+  // 2) Aligner le prochain tick sur l'heure pile suivante (HH:00:00), puis interval 1h
+  const now      = new Date();
+  const msToNext = (60 - now.getMinutes()) * 60 * 1000 - now.getSeconds() * 1000 - now.getMilliseconds();
+
+  setTimeout(() => {
+    try { maybeTakeHourlySnapshot(); } catch (e) { console.error('[snapshot] tick :', e.message); }
+    snapshotTimer = setInterval(() => {
+      try { maybeTakeHourlySnapshot(); } catch (e) { console.error('[snapshot] tick :', e.message); }
+    }, SNAPSHOT_INTERVAL_MS);
+  }, Math.max(1000, msToNext));
+}
+
+function stopSnapshotScheduler() {
+  if (snapshotTimer) { clearInterval(snapshotTimer); snapshotTimer = null; }
+}
+
+async function previewSnapshotTasks(filename) {
+  const meta = parseSnapshotName(filename);
+  if (!meta) return { ok: false, error: 'Nom de snapshot invalide' };
+  const full = path.join(SNAPSHOTS_DIR, filename);
+  if (!fs.existsSync(full)) return { ok: false, error: 'Snapshot introuvable' };
+  const r = await callAgent({ action: 'lister' }, full);
+  if (r && Array.isArray(r.taches)) {
+    return {
+      ok: true,
+      filename,
+      timestamp: meta.timestamp,
+      beforeRestore: meta.beforeRestore,
+      taches: r.taches,
+    };
+  }
+  return { ok: false, error: (r && r.message) || 'Lecture du snapshot echouee' };
+}
+
+function restoreSnapshotFile(filename) {
+  const meta = parseSnapshotName(filename);
+  if (!meta) return { ok: false, error: 'Nom de snapshot invalide' };
+  const src = path.join(SNAPSHOTS_DIR, filename);
+  if (!fs.existsSync(src)) return { ok: false, error: 'Snapshot introuvable' };
+  // Securite : snapshot de l'etat courant AVANT d'ecraser
+  const backupName = takeSnapshot('before-restore');
+  try {
+    fs.copyFileSync(src, DB_PATH);
+    lastOwnWrite = Date.now();
+    return { ok: true, backup: backupName };
+  } catch (e) {
+    return { ok: false, error: e.message, backup: backupName };
+  }
 }
 
 // ─── Fenetre ──────────────────────────────────────────────────────────────────
@@ -377,6 +534,8 @@ app.whenReady().then(() => {
 
   createWindow();
 
+  try { startSnapshotScheduler(); } catch (e) { console.error('[snapshot] scheduler :', e.message); }
+
   if (IS_PACKAGED) {
     setTimeout(() => {
       try { getAutoUpdater().checkForUpdates().catch(() => { /* silencieux */ }); }
@@ -390,6 +549,7 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  stopSnapshotScheduler();
   if (process.platform !== 'darwin') app.quit();
 });
 
@@ -541,4 +701,26 @@ ipcMain.handle('apply-window-bounds', (event, bounds) => {
   } catch (e) {
     return { ok: false, error: e.message };
   }
+});
+
+// ─── IPC : snapshots horaires ─────────────────────────────────────────────────
+ipcMain.handle('snapshot-list', () => {
+  return listSnapshotFiles().map(s => ({
+    filename:      s.filename,
+    timestamp:     s.timestamp,
+    size:          s.size,
+    beforeRestore: s.beforeRestore,
+  }));
+});
+
+ipcMain.handle('snapshot-preview', async (event, filename) => {
+  return previewSnapshotTasks(filename);
+});
+
+ipcMain.handle('snapshot-restore', async (event, filename) => {
+  const r = restoreSnapshotFile(filename);
+  if (r.ok && mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('db-changed');
+  }
+  return r;
 });

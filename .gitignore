@@ -42,6 +42,9 @@ desktop.ini
 # ─── Backups locaux ──────────────────────────────────────────
 tasks.db.backup-*
 
+# ─── Snapshots horaires (generes a la racine en mode dev) ────
+snapshots/
+
 # ─── Memoire agent (generee, ne pas versionner) ──────────────
 CLAUDE.md
 AGENTS.md
