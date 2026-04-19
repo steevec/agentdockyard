@@ -23,7 +23,7 @@ Install the app, copy the prompt snippet shown in the built-in guide, paste it i
 ---
 
 <p align="center">
-  <img src="docs/screenshots/agentdockyard-dark-overview.svg" alt="AgentDockyard dark mode overview" width="900">
+  <img src="docs/screenshots/agentdockyard-dark-overview.png" alt="AgentDockyard dark mode overview" width="900">
 </p>
 
 ## Why this exists
@@ -119,7 +119,7 @@ In the morning, you do not need to inspect logs or reopen sessions first: the da
 ## Screenshot
 
 <p align="center">
-  <img src="docs/screenshots/agentdockyard-dark-overview.svg" alt="AgentDockyard dark mode grouped by repo and agent" width="900">
+  <img src="docs/screenshots/agentdockyard-dark-overview.png" alt="AgentDockyard dark mode grouped by repo and agent" width="900">
 </p>
 
 Dark and light themes are both available in the app.
