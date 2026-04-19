@@ -37,6 +37,10 @@ desktop.ini
 .idea/
 *.swp
 *.swo
+.history/
+
+# ─── Backups locaux ──────────────────────────────────────────
+tasks.db.backup-*
 
 # ─── Memoire agent (generee, ne pas versionner) ──────────────
 CLAUDE.md
