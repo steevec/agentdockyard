@@ -79,6 +79,7 @@ const CONFIG_PATH = path.join(USER_DATA, 'config.json');
 // ─── Config ───────────────────────────────────────────────────────────────────
 const CONFIG_DEFAULT = {
   theme: 'dark',
+  language: 'en',
   purge: {
     enabled: true,
     delai_fait_jours: 90,
@@ -320,6 +321,11 @@ function createWindow() {
     mainWindow = null;
   });
 }
+
+// ─── Smooth scrolling & performance flags ────────────────────────────────────
+app.commandLine.appendSwitch('enable-smooth-scrolling');
+app.commandLine.appendSwitch('enable-gpu-rasterization');
+app.commandLine.appendSwitch('enable-zero-copy');
 
 // ─── App lifecycle ────────────────────────────────────────────────────────────
 app.whenReady().then(() => {

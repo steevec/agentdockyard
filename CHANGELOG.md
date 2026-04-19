@@ -7,6 +7,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 _(nothing yet)_
 
+## [1.1.0] - 2026-04-19
+
+### Added
+- **Internationalisation (i18n)** — 9 languages: English (default), Français, Deutsch, Español, Italiano, Português, 中文, 日本語, हिन्दी. Language selector with flag emojis in Settings.
+- **Cancel button** in the task add form — closes the form and resets fields without adding a task.
+- **Unified AI prompt** in the Guide panel — a single copy-paste block for all agents (Claude Code, Claude Cowork, Copilot, Codex, etc.) replacing the previous per-agent blocks.
+
+### Fixed
+- **Dropdown reset on auto-refresh** — open status dropdowns are now preserved across automatic refresh cycles.
+- **Window drag jerkiness** — the header bar is now a proper Electron drag region; all interactive elements (buttons, selects) are correctly marked `no-drag`.
+
+### Performance
+- GPU compositing layer (`will-change`, `transform: translateZ(0)`) applied to the tasks panel for smoother scrolling.
+- Chromium smooth scrolling, GPU rasterisation and zero-copy flags enabled at startup.
+
 ## [1.0.0] - 2026-04-18
 
 First public release.
@@ -39,5 +54,6 @@ First public release.
 - Installer is unsigned — Windows SmartScreen warns on first launch.
 - No telemetry, no crash reporting — issues are to be reported manually on GitHub.
 
-[Unreleased]: https://github.com/steevec/agentdockyard/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/steevec/agentdockyard/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/steevec/agentdockyard/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/steevec/agentdockyard/releases/tag/v1.0.0

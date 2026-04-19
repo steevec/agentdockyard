@@ -2,9 +2,99 @@
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 const STATUT_PRIO  = { a_faire_rapidement:0, en_cours:1, bloque:2, en_attente:3, annule:4, fait:5 };
-const STATUT_LABEL = { a_faire_rapidement:'Urgent', en_cours:'En cours', bloque:'Bloque', en_attente:'En attente', annule:'Annule', fait:'Fait' };
 const STATUT_COLOR = { a_faire_rapidement:'#c0504a', en_cours:'#4a82c0', bloque:'#c07840', en_attente:'#b89030', annule:'#505878', fait:'#3a9e60' };
 const STATUTS_LIST = ['a_faire_rapidement','en_cours','en_attente','bloque','annule','fait'];
+
+// ─── i18n ─────────────────────────────────────────────────────────────────────
+let currentLang = 'en';
+
+function t(key) {
+  const dict = (window.I18N && window.I18N[currentLang]) || {};
+  const fallback = (window.I18N && window.I18N['en']) || {};
+  return dict[key] !== undefined ? dict[key] : (fallback[key] !== undefined ? fallback[key] : key);
+}
+
+function statusLabel(s) { return t('statut_' + s) || s; }
+
+function applyI18n() {
+  // Header
+  const addToggle = document.getElementById('btn-add-toggle');
+  if (addToggle) addToggle.textContent = t('btn_add_task');
+  const btnTheme = document.getElementById('btn-theme');
+  if (btnTheme) btnTheme.title = t('btn_theme_title');
+  const btnSettings = document.getElementById('btn-settings');
+  if (btnSettings) btnSettings.title = t('btn_settings_title');
+  const btnGuide = document.getElementById('btn-guide');
+  if (btnGuide) btnGuide.title = t('btn_guide_title');
+  const btnRefresh = document.getElementById('btn-refresh');
+  if (btnRefresh) btnRefresh.title = t('btn_refresh_title');
+  // Add form
+  const fSubmit = document.getElementById('f-submit');
+  if (fSubmit) fSubmit.textContent = t('btn_submit_add');
+  const fCancel = document.getElementById('f-cancel');
+  if (fCancel) fCancel.textContent = t('btn_cancel');
+  const fRepo = document.getElementById('f-repo');
+  if (fRepo) fRepo.placeholder = t('form_repo_ph');
+  const fSujet = document.getElementById('f-sujet');
+  if (fSujet) fSujet.placeholder = t('form_sujet_ph');
+  const fContexte = document.getElementById('f-contexte');
+  if (fContexte) fContexte.placeholder = t('form_contexte_ph');
+  const fNote = document.getElementById('f-note');
+  if (fNote) fNote.placeholder = t('form_note_ph');
+  // Update status select options in add form and modal
+  updateStatusSelectOptions('f-statut', false);
+  updateStatusSelectOptions('m-statut', true);
+  // Modal buttons
+  const mCancel = document.getElementById('modal-cancel');
+  if (mCancel) mCancel.textContent = t('modal_btn_cancel');
+  const mSave = document.getElementById('modal-save');
+  if (mSave) mSave.textContent = t('modal_btn_save');
+  // Settings panel title
+  const settingsTitle = document.querySelector('#settings-panel .side-panel-header h2');
+  if (settingsTitle) settingsTitle.textContent = t('settings_title');
+  const settingsClose = document.getElementById('settings-cancel');
+  if (settingsClose) settingsClose.textContent = t('btn_close');
+  const settingsSave = document.getElementById('settings-save');
+  if (settingsSave) settingsSave.textContent = t('btn_save_settings');
+  // Language section title
+  const cfgLangTitle = document.getElementById('cfg-lang-title');
+  if (cfgLangTitle) cfgLangTitle.textContent = t('settings_language');
+  // Guide panel
+  const guideTitle = document.querySelector('#guide-panel .side-panel-header h2');
+  if (guideTitle) guideTitle.textContent = t('guide_title');
+  const tabUsage = document.querySelector('.tab[data-tab="tab-usage"]');
+  if (tabUsage) tabUsage.textContent = t('guide_tab_usage');
+  const tabPrompt = document.querySelector('.tab[data-tab="tab-prompt"]');
+  if (tabPrompt) tabPrompt.textContent = t('guide_tab_prompt');
+  // Guide prompt elements
+  const gPathTitle = document.getElementById('guide-prompt-path-title');
+  if (gPathTitle) gPathTitle.textContent = t('guide_prompt_path_title');
+  const gPathDesc = document.getElementById('guide-prompt-path-desc');
+  if (gPathDesc) gPathDesc.textContent = t('guide_prompt_path_desc');
+  const btnCopyPath = document.getElementById('btn-copy-path');
+  if (btnCopyPath) btnCopyPath.textContent = t('btn_copy_path');
+  const gUnifiedTitle = document.getElementById('guide-prompt-unified-title');
+  if (gUnifiedTitle) gUnifiedTitle.textContent = t('guide_prompt_unified_title');
+  const gUnifiedDesc = document.getElementById('guide-prompt-unified-desc');
+  if (gUnifiedDesc) gUnifiedDesc.textContent = t('guide_prompt_unified_desc');
+  const btnCopyUnified = document.getElementById('btn-copy-unified');
+  if (btnCopyUnified) btnCopyUnified.textContent = t('btn_copy_prompt');
+}
+
+function updateStatusSelectOptions(selectId, includeFait) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  const cur = sel.value;
+  const options = [
+    { v: 'en_cours',             label: statusLabel('en_cours') },
+    { v: 'a_faire_rapidement',   label: '\uD83D\uDD34 ' + statusLabel('a_faire_rapidement') },
+    { v: 'en_attente',           label: statusLabel('en_attente') },
+    { v: 'bloque',               label: statusLabel('bloque') },
+    { v: 'annule',               label: statusLabel('annule') },
+  ];
+  if (includeFait) options.push({ v: 'fait', label: '\u2705 ' + statusLabel('fait') });
+  sel.innerHTML = options.map(o => `<option value="${o.v}"${o.v === cur ? ' selected' : ''}>${esc(o.label)}</option>`).join('');
+}
 
 // ─── Etat ─────────────────────────────────────────────────────────────────────
 let currentTasks   = [];
@@ -13,6 +103,7 @@ let agentsConfig   = [];
 let collapsedRepos = new Set(JSON.parse(localStorage.getItem('collapsedRepos') || '[]'));
 let visibleFaites  = new Set();
 let openNotes      = new Set();
+let openDropdowns  = new Set();
 let editingTaskId  = null;
 let refreshTimer   = null;
 let addBarOpen     = false;
@@ -22,6 +113,8 @@ async function init() {
   currentConfig = await window.taskAPI.getConfig();
   agentsConfig  = (currentConfig.agents && currentConfig.agents.length) ? currentConfig.agents : [];
 
+  currentLang = currentConfig.language || 'en';
+  applyI18n();
   applyTheme(currentConfig.theme || 'dark');
   populateAgentSelects();
 
@@ -66,10 +159,10 @@ function populateAgentSelects() {
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
 function applyTheme(theme) {
-  const t = (theme === 'light') ? 'light' : 'dark';
-  document.documentElement.setAttribute('data-theme', t);
+  const th = (theme === 'light') ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', th);
   const btn = document.getElementById('btn-theme');
-  if (btn) btn.textContent = (t === 'dark') ? '\u{1F319}' : '\u2600\uFE0F';
+  if (btn) btn.textContent = (th === 'dark') ? '\u{1F319}' : '\u2600\uFE0F';
 }
 
 async function toggleTheme() {
@@ -96,8 +189,8 @@ async function refreshTasks() {
     if (r && r.error) { showToast('Erreur DB : ' + r.error, 'error'); return; }
     currentTasks = r || [];
     renderTasks(currentTasks);
-    const nb = currentTasks.filter(t => t.statut !== 'fait').length;
-    document.getElementById('task-count').textContent = nb ? `${nb} tache${nb>1?'s':''} active${nb>1?'s':''}` : '';
+    const nb = currentTasks.filter(tk => tk.statut !== 'fait').length;
+    document.getElementById('task-count').textContent = nb ? `${nb} ${nb > 1 ? t('tasks_active_many') : t('tasks_active_one')}` : '';
   } catch(err) { showToast('Erreur : ' + err.message, 'error'); }
   finally { showDot(false); resetRefreshTimer(); }
 }
@@ -131,7 +224,7 @@ function renderTasks(tasks) {
   });
 
   if (!visibleTasks.length) {
-    container.innerHTML = `<div id="empty-state"><div class="icon">\u2705</div><div>Aucune tache en cours</div></div>`;
+    container.innerHTML = `<div id="empty-state"><div class="icon">\u2705</div><div>${esc(t('empty_no_tasks'))}</div></div>`;
     return;
   }
 
@@ -158,11 +251,17 @@ function renderTasks(tasks) {
   container.innerHTML = repoKeys.map(r => renderRepoGroup(r, groupes[r], { showFait, maxPerGrp })).join('');
 
   const closedIds = new Set(visibleTasks.filter(t => t.statut === 'fait' || t.statut === 'annule').map(t => t.id));
+  // Restore open notes
   for (const id of [...openNotes]) {
     if (closedIds.has(id)) { openNotes.delete(id); continue; }
     const el  = document.getElementById(`note-${id}`);
     const btn = el && el.previousElementSibling;
-    if (el) { el.classList.add('visible'); if (btn) btn.textContent = '\u{1F4C4} Masquer la note'; }
+    if (el) { el.classList.add('visible'); if (btn) btn.textContent = t('task_note_hide'); }
+  }
+  // Restore open status dropdowns
+  for (const id of [...openDropdowns]) {
+    const dd = document.getElementById(`dd-${id}`);
+    if (dd) dd.classList.add('open'); else openDropdowns.delete(id);
   }
 }
 
@@ -198,18 +297,19 @@ function renderRepoGroup(repo, agentsMap, opts) {
     if (opts && opts.maxPerGrp > 0) taches = taches.slice(0, opts.maxPerGrp);
     h += `<div class="groupe-agent">`;
     h += `<div class="groupe-agent-titre">${getAgentEmoji(ag) || '\u{1F527}'} ${esc(ag)}</div>`;
-    h += taches.map(t => renderCard(t)).join('');
+    h += taches.map(tk => renderCard(tk)).join('');
     h += `</div>`;
   }
 
   if (faites.length && (!opts || opts.showFait !== false)) {
     const fVis = visibleFaites.has(repo);
     h += `<button class="btn-toggle-faites" onclick='toggleFaites(${j(repo)},${j(b64)})'>`;
-    h += `${fVis ? '\u25BE' : '\u25B8'} \u2705 ${faites.length} tache${faites.length>1?'s':''} terminee${faites.length>1?'s':''}`;
+    const doneLabel = faites.length > 1 ? t('repo_done_many') : t('repo_done_one');
+    h += `${fVis ? '\u25BE' : '\u25B8'} \u2705 ${faites.length} ${esc(doneLabel)}`;
     h += `</button>`;
     h += `<div class="taches-faites${fVis ? ' visible' : ''}" id="faites-${b64}">`;
     h += `<div class="groupe-agent">`;
-    h += faites.map(t => renderCard(t)).join('');
+    h += faites.map(tk => renderCard(tk)).join('');
     h += `</div></div>`;
   }
 
@@ -217,50 +317,50 @@ function renderRepoGroup(repo, agentsMap, opts) {
   return h;
 }
 
-function renderCard(t) {
-  const isFait  = t.statut === 'fait';
-  const isClaim = !!(t.reclame_par && t.reclame_par.trim());
-  const hasNote = !!(t.note && t.note.trim());
-  const hasCtx  = !!(t.contexte && t.contexte.trim());
-  const dateCr  = formatDate(t.date_creation);
-  const dateCl  = t.date_cloture ? ' \u00B7 Clos ' + formatDate(t.date_cloture) : '';
+function renderCard(task) {
+  const isFait  = task.statut === 'fait';
+  const isClaim = !!(task.reclame_par && task.reclame_par.trim());
+  const hasNote = !!(task.note && task.note.trim());
+  const hasCtx  = !!(task.contexte && task.contexte.trim());
+  const dateCr  = formatDate(task.date_creation);
+  const dateCl  = task.date_cloture ? ' ' + t('task_closed_prefix') + formatDate(task.date_cloture) : '';
 
-  let h = `<div class="task-card" data-statut="${t.statut}" id="task-${t.id}">`;
-  h += `<div class="task-id-col"><div class="task-id-bubble s-${t.statut}">${t.id}</div></div>`;
+  let h = `<div class="task-card" data-statut="${task.statut}" id="task-${task.id}">`;
+  h += `<div class="task-id-col"><div class="task-id-bubble s-${task.statut}">${task.id}</div></div>`;
   h += `<div class="task-body">`;
   h += `<div class="task-top">`;
-  h += `<span class="task-sujet" onclick="openEditModal(${t.id})">${esc(t.sujet)}</span>`;
+  h += `<span class="task-sujet" onclick="openEditModal(${task.id})">${esc(task.sujet)}</span>`;
 
   h += `<div class="statut-wrapper">`;
-  h += `<button class="task-statut-badge badge-${t.statut}" onclick="toggleDropdown(event,${t.id})">${STATUT_LABEL[t.statut] || t.statut}</button>`;
-  h += `<div class="statut-dropdown" id="dd-${t.id}">`;
+  h += `<button class="task-statut-badge badge-${task.statut}" onclick="toggleDropdown(event,${task.id})">${esc(statusLabel(task.statut))}</button>`;
+  h += `<div class="statut-dropdown" id="dd-${task.id}">`;
   for (const s of STATUTS_LIST) {
-    if (s === t.statut) continue;
-    h += `<div class="statut-opt" onclick='changeStatut(${t.id},${j(s)})'>`;
+    if (s === task.statut) continue;
+    h += `<div class="statut-opt" onclick='changeStatut(${task.id},${j(s)})'>`;
     h += `<span class="statut-opt-dot" style="background:${STATUT_COLOR[s]}"></span>`;
-    h += `${STATUT_LABEL[s]}</div>`;
+    h += `${esc(statusLabel(s))}</div>`;
   }
   h += `</div></div>`;
 
   h += `<div class="task-actions">`;
-  if (!isFait) h += `<button class="btn-act btn-fait" onclick="doCloseTask(${t.id})">\u2713 Fait</button>`;
-  h += `<button class="btn-act btn-edit"   onclick="openEditModal(${t.id})">\u270E</button>`;
-  h += `<button class="btn-act btn-delete" onclick="doDeleteTask(${t.id})">\u2715</button>`;
+  if (!isFait) h += `<button class="btn-act btn-fait" onclick="doCloseTask(${task.id})">${esc(t('task_done_btn'))}</button>`;
+  h += `<button class="btn-act btn-edit"   onclick="openEditModal(${task.id})">\u270E</button>`;
+  h += `<button class="btn-act btn-delete" onclick="doDeleteTask(${task.id})">\u2715</button>`;
   h += `</div>`;
   h += `</div>`;
 
-  if (hasCtx) h += `<div class="task-contexte">${esc(t.contexte)}</div>`;
+  if (hasCtx) h += `<div class="task-contexte">${esc(task.contexte)}</div>`;
 
   if (hasNote) {
-    h += `<span class="task-note-toggle" onclick="toggleNote(${t.id})">\u{1F4C4} Voir la note</span>`;
-    h += `<div class="task-note" id="note-${t.id}">${esc(t.note)}</div>`;
+    h += `<span class="task-note-toggle" onclick="toggleNote(${task.id})">${esc(t('task_note_show'))}</span>`;
+    h += `<div class="task-note" id="note-${task.id}">${esc(task.note)}</div>`;
   }
 
   h += `<div class="task-footer">`;
   h += `<span class="task-date">${dateCr}${dateCl}</span>`;
   if (isClaim) {
-    h += `<span class="task-claimed">\u{1F512} ${esc(t.reclame_par)} `;
-    h += `<button class="btn-liberer" onclick="doReleaseTask(${t.id})">\u2715 Liberer</button></span>`;
+    h += `<span class="task-claimed">\u{1F512} ${esc(task.reclame_par)} `;
+    h += `<button class="btn-liberer" onclick="doReleaseTask(${task.id})">${esc(t('task_release_btn'))}</button></span>`;
   }
   h += `</div>`;
 
@@ -274,17 +374,18 @@ function toggleDropdown(e, id) {
   const dd = document.getElementById(`dd-${id}`);
   const wasOpen = dd.classList.contains('open');
   closeAllDropdowns();
-  if (!wasOpen) dd.classList.add('open');
+  if (!wasOpen) { dd.classList.add('open'); openDropdowns.add(id); }
 }
 
 function closeAllDropdowns() {
   document.querySelectorAll('.statut-dropdown.open').forEach(d => d.classList.remove('open'));
+  openDropdowns.clear();
 }
 
 async function changeStatut(id, statut) {
   closeAllDropdowns();
   await window.taskAPI.setStatus(id, statut);
-  showToast(`Statut mis a jour -> ${STATUT_LABEL[statut]}`, 'success');
+  showToast(`${t('toast_status_updated')} ${statusLabel(statut)}`, 'success');
   await refreshTasks();
 }
 
@@ -305,7 +406,8 @@ function toggleFaites(repo, b64) {
   const btn = el.previousElementSibling;
   const nb = el.querySelectorAll('.task-card').length;
   const vis = el.classList.contains('visible');
-  btn.innerHTML = `${vis ? '\u25BE' : '\u25B8'} \u2705 ${nb} tache${nb>1?'s':''} terminee${nb>1?'s':''}`;
+  const doneLabel = nb > 1 ? t('repo_done_many') : t('repo_done_one');
+  btn.innerHTML = `${vis ? '\u25BE' : '\u25B8'} \u2705 ${nb} ${esc(doneLabel)}`;
 }
 
 function toggleNote(id) {
@@ -315,12 +417,16 @@ function toggleNote(id) {
   el.classList.toggle('visible');
   const isOpen = el.classList.contains('visible');
   if (isOpen) openNotes.add(id); else openNotes.delete(id);
-  btn.textContent = isOpen ? '\u{1F4C4} Masquer la note' : '\u{1F4C4} Voir la note';
+  btn.textContent = isOpen ? t('task_note_hide') : t('task_note_show');
 }
 
 // ─── Formulaire ajout ──────────────────────────────────────────────────────────
 function bindAddForm() {
   document.getElementById('add-form').addEventListener('submit', submitAddForm);
+  document.getElementById('f-cancel').addEventListener('click', () => {
+    document.getElementById('add-form').reset();
+    if (addBarOpen) toggleAddBar();
+  });
 }
 
 async function submitAddForm(e) {
@@ -331,10 +437,10 @@ async function submitAddForm(e) {
     sujet: form.sujet.value.trim(), statut: form.statut.value,
     contexte: form.contexte.value.trim(), note: form.note.value.trim(),
   };
-  if (!data.sujet) { showToast('Le sujet est obligatoire', 'error'); return; }
+  if (!data.sujet) { showToast(t('form_sujet_required') || 'Sujet obligatoire', 'error'); return; }
   const r = await window.taskAPI.addTask(data);
   if (r.error) { showToast('Erreur : ' + r.error, 'error'); return; }
-  showToast(`Tache #${r.id} creee \u2705`, 'success');
+  showToast(t('toast_task_created').replace('ID', r.id), 'success');
   form.sujet.value = ''; form.contexte.value = ''; form.note.value = '';
   if (addBarOpen) toggleAddBar();
   await refreshTasks();
@@ -343,20 +449,20 @@ async function submitAddForm(e) {
 // ─── Actions ───────────────────────────────────────────────────────────────────
 async function doCloseTask(id) {
   await window.taskAPI.closeTask(id, '');
-  showToast(`Tache #${id} cloturee \u2705`, 'success');
+  showToast(t('toast_task_closed').replace('ID', id), 'success');
   await refreshTasks();
 }
 
 async function doDeleteTask(id) {
-  if (!confirm(`Supprimer la tache #${id} definitivement ?`)) return;
+  if (!confirm(`Delete task #${id}?`)) return;
   await window.taskAPI.deleteTask(id);
-  showToast(`Tache #${id} supprimee`, 'success');
+  showToast(t('toast_task_deleted').replace('ID', id), 'success');
   await refreshTasks();
 }
 
 async function doReleaseTask(id) {
   await window.taskAPI.releaseTask(id);
-  showToast('Reclamation liberee', 'success');
+  showToast(t('toast_claim_released'), 'success');
   await refreshTasks();
 }
 
@@ -370,16 +476,16 @@ function bindModal() {
 }
 
 function openEditModal(id) {
-  const t = currentTasks.find(x => x.id === id);
-  if (!t) return;
+  const task = currentTasks.find(x => x.id === id);
+  if (!task) return;
   editingTaskId = id;
-  document.getElementById('modal-title').textContent = `Modifier tache #${id}`;
-  document.getElementById('m-agent').value    = t.agent    || '';
-  document.getElementById('m-repo').value     = t.repo     || '';
-  document.getElementById('m-statut').value   = t.statut   || 'en_cours';
-  document.getElementById('m-sujet').value    = t.sujet    || '';
-  document.getElementById('m-contexte').value = t.contexte || '';
-  document.getElementById('m-note').value     = t.note     || '';
+  document.getElementById('modal-title').textContent = `${t('modal_title_prefix')} #${id}`;
+  document.getElementById('m-agent').value    = task.agent    || '';
+  document.getElementById('m-repo').value     = task.repo     || '';
+  document.getElementById('m-statut').value   = task.statut   || 'en_cours';
+  document.getElementById('m-sujet').value    = task.sujet    || '';
+  document.getElementById('m-contexte').value = task.contexte || '';
+  document.getElementById('m-note').value     = task.note     || '';
   document.getElementById('modal-overlay').classList.add('visible');
   document.getElementById('m-sujet').focus();
 }
@@ -400,7 +506,7 @@ async function saveModal() {
     contexte: document.getElementById('m-contexte').value.trim(),
     note:     document.getElementById('m-note').value.trim(),
   };
-  if (!data.sujet) { showToast('Le sujet est obligatoire', 'error'); return; }
+  if (!data.sujet) { showToast(t('form_sujet_required') || 'Sujet obligatoire', 'error'); return; }
   const orig = currentTasks.find(x => x.id === editingTaskId);
   if (data.statut === 'fait' && orig && orig.statut !== 'fait') {
     await window.taskAPI.closeTask(editingTaskId, data.note);
@@ -408,7 +514,7 @@ async function saveModal() {
   } else {
     await window.taskAPI.updateTask(data);
   }
-  showToast(`Tache #${editingTaskId} mise a jour \u2705`, 'success');
+  showToast(t('toast_task_updated').replace('ID', editingTaskId), 'success');
   closeModal();
   await refreshTasks();
 }
@@ -490,6 +596,14 @@ async function openSettingsPanel() {
   document.getElementById('cfg-win-fullheight').checked = !!win.fullHeight;
   await loadDisplays(win.displayIndex || 0);
 
+  // Langue
+  const cfgLangSel = document.getElementById('cfg-language');
+  if (cfgLangSel && window.LANGUAGES) {
+    cfgLangSel.innerHTML = window.LANGUAGES.map(l =>
+      `<option value="${esc(l.code)}"${l.code === currentLang ? ' selected' : ''}>${esc(l.flag + ' ' + l.name)}</option>`
+    ).join('');
+  }
+
   // Agents
   renderAgentsList(agentsConfig);
 
@@ -556,12 +670,15 @@ async function saveSettings() {
     },
     window: win,
     agents: collectAgentsFromUI(),
+    language: (document.getElementById('cfg-language') || {}).value || currentLang,
   };
   currentConfig = await window.taskAPI.saveConfig(patch);
   agentsConfig  = currentConfig.agents || [];
+  currentLang   = currentConfig.language || 'en';
   applyTheme(currentConfig.theme || 'dark');
+  applyI18n();
   populateAgentSelects();
-  showToast('\u2705 Parametres sauvegardes', 'success');
+  showToast(t('toast_settings_saved') || '\u2705 Settings saved', 'success');
   closeSidePanel('settings-overlay');
   resetRefreshTimer();
   await refreshTasks();
@@ -599,13 +716,13 @@ async function loadDisplays(selectedIndex) {
 
 async function saveCurrentBounds() {
   const b = await window.taskAPI.getWindowBounds();
-  if (!b) { showToast('Fenetre introuvable', 'error'); return; }
+  if (!b) { showToast('Window not found', 'error'); return; }
   document.getElementById('cfg-win-x').value = b.x;
   document.getElementById('cfg-win-y').value = b.y;
   document.getElementById('cfg-win-w').value = b.width;
   document.getElementById('cfg-win-h').value = b.height;
   document.getElementById('cfg-win-enabled').checked = true;
-  showToast('\u2705 Position actuelle copiee dans les champs', 'success');
+  showToast(t('toast_win_position_copied'), 'success');
 }
 
 async function applyBoundsFromForm() {
@@ -613,18 +730,18 @@ async function applyBoundsFromForm() {
   const xVal = win.x === null ? 0 : win.x;
   const yVal = win.y === null ? 0 : win.y;
   const r = await window.taskAPI.applyWindowBounds({ x: xVal, y: yVal, width: win.width, height: win.height });
-  if (r && r.ok) showToast('\u2705 Fenetre repositionnee', 'success');
-  else showToast('Echec du positionnement', 'error');
+  if (r && r.ok) showToast(t('toast_win_repositioned'), 'success');
+  else showToast('Window positioning failed', 'error');
 }
 
 async function doPurgeNow() {
-  if (!confirm('Vider toutes les taches fait/annule cloturees ? Cette action est irreversible.')) return;
+  if (!confirm(t('confirm_purge'))) return;
   const r = await window.taskAPI.purgeNow();
   if (r && r.statut === 'OK') {
-    showToast(`\u2705 ${r.deleted || 0} tache(s) supprimee(s)`, 'success');
+    showToast(t('toast_purge_ok').replace('COUNT', r.deleted || 0), 'success');
     await refreshTasks();
   } else {
-    showToast('Echec purge : ' + ((r && r.message) || 'erreur'), 'error');
+    showToast('Purge error: ' + ((r && r.message) || 'error'), 'error');
   }
 }
 
@@ -634,17 +751,17 @@ async function doOpenDbFolder() {
 
 async function doExportJson() {
   const r = await window.taskAPI.exportJson();
-  if (r && r.ok) showToast(`\u2705 Export : ${r.count} tache(s) \u2192 ${r.path}`, 'success');
-  else showToast('Echec export : ' + ((r && r.error) || 'erreur'), 'error');
+  if (r && r.ok) showToast(t('toast_export_ok').replace('COUNT', r.count).replace('PATH', r.path), 'success');
+  else showToast('Export error: ' + ((r && r.error) || 'error'), 'error');
 }
 
 async function doCheckUpdates() {
-  showToast('Recherche de mises a jour...', 'success');
+  showToast(t('toast_searching_updates'), 'success');
   const r = await window.taskAPI.checkUpdates();
-  if (r && r.dev) { showToast('Mode dev : verification ignoree', 'success'); return; }
-  if (r && r.available) showToast(`\u2705 Mise a jour disponible : v${r.version}`, 'success');
-  else if (r && r.error) showToast('Erreur MAJ : ' + r.error, 'error');
-  else showToast('Vous etes deja sur la derniere version', 'success');
+  if (r && r.dev) { showToast('Dev mode: update check skipped', 'success'); return; }
+  if (r && r.available) showToast(`\u2705 Update available: v${r.version}`, 'success');
+  else if (r && r.error) showToast('Update error: ' + r.error, 'error');
+  else showToast(t('toast_up_to_date'), 'success');
 }
 
 // ─── Panneau Guide ────────────────────────────────────────────────────────────
@@ -682,68 +799,66 @@ function bindGuidePanel() {
 
 async function openGuidePanel() {
   const agentPath = await window.taskAPI.getAgentPath();
-  const escPath   = agentPath.replace(/\\/g, '\\\\');
   const quote     = `"${agentPath}"`;
 
   document.getElementById('guide-agent-path').textContent = agentPath;
-  document.getElementById('guide-claude-code').textContent   = buildPromptBlock('claude-code',   quote, 'windows');
-  document.getElementById('guide-claude-cowork').textContent = buildPromptBlock('claude-cowork', quote, 'linux');
-  document.getElementById('guide-generic').textContent       = buildPromptBlock('NOM-DE-TON-AGENT', quote, 'generic');
+
+  const unified = document.getElementById('guide-unified');
+  if (unified) unified.textContent = buildUnifiedPrompt(quote);
 
   openSidePanel('guide-overlay');
 }
 
-function buildPromptBlock(agentId, quotedPath, variant) {
+function buildUnifiedPrompt(quotedPath) {
   const isExe = /\.exe"?$/i.test(quotedPath.replace(/\\\\/g, '\\'));
   const invoke = isExe ? quotedPath : `python ${quotedPath}`;
 
-  let note = '';
-  if (variant === 'linux') {
-    note = '\n# Note : AgentDockyard gere automatiquement l\'acces VirtioFS (Linux / Cowork).\n# Si agent.exe Windows n\'est pas accessible, utiliser la version Python equivalente :\n#   python /chemin/vers/agent.py \'{"action":"..."}\'';
-  }
-
   return (
-`## AgentDockyard - Gestion des taches
+`## AgentDockyard - Task Management
 
-Tu as acces a AgentDockyard pour declarer et suivre tes taches en temps reel.
+You have access to AgentDockyard to declare and track your tasks in real time.
 Script : ${invoke}
 
-=== REGLES OBLIGATOIRES ===
-1. Declare TOUJOURS tes taches des que tu commences.
-2. Cloture TOUJOURS avec une note de resume.
-3. Ne laisse JAMAIS une tache en_cours si tu t'arretes.
+=== MANDATORY RULES ===
+1. ALWAYS declare your tasks as soon as you start.
+2. ALWAYS close with a summary note.
+3. NEVER leave a task en_cours when you stop.
 
-=== COMMANDES ===
+=== COMMANDS ===
 
-Demarrer une tache :
-${invoke} '{"action":"ajouter","agent":"${agentId}","repo":"NOM_REPO","sujet":"Description courte","statut":"en_cours"}'
+Start a task :
+${invoke} '{"action":"ajouter","agent":"YOUR-AGENT-ID","repo":"REPO_NAME","sujet":"Short description","statut":"en_cours"}'
 
-Mettre a jour (avancement) :
-${invoke} '{"action":"modifier","id":ID,"note":"Avancement : etape X faite, reste Y"}'
+Update (progress) :
+${invoke} '{"action":"modifier","id":ID,"note":"Progress: step X done, Y remaining"}'
 
-Cloturer (fin de tache) :
-${invoke} '{"action":"cloturer","id":ID,"note":"Resume complet de ce qui a ete fait"}'
+Close (task done) :
+${invoke} '{"action":"cloturer","id":ID,"note":"Full summary of what was done"}'
 
-Signaler un blocage :
-${invoke} '{"action":"changer_statut","id":ID,"statut":"bloque","note":"Raison precise du blocage"}'
+Report a blocker :
+${invoke} '{"action":"changer_statut","id":ID,"statut":"bloque","note":"Precise reason for blocker"}'
 
-Mettre en attente :
-${invoke} '{"action":"changer_statut","id":ID,"statut":"en_attente","note":"En attente de quoi"}'
+Put on hold :
+${invoke} '{"action":"changer_statut","id":ID,"statut":"en_attente","note":"Waiting for what"}'
 
-Reclamer une tache (indiquer que tu la traites) :
-${invoke} '{"action":"reclamer","id":ID,"agent":"${agentId}"}'
+Claim a task (mark it as yours) :
+${invoke} '{"action":"reclamer","id":ID,"agent":"YOUR-AGENT-ID"}'
 
-Liberer une reclamation :
+Release a claim :
 ${invoke} '{"action":"liberer","id":ID}'
 
-Lister toutes les taches :
+List all tasks :
 ${invoke} '{"action":"lister"}'
 
-Lister par repo :
-${invoke} '{"action":"lister_par_repo","repo":"NOM_REPO"}'
+List by repo :
+${invoke} '{"action":"lister_par_repo","repo":"REPO_NAME"}'
 
-=== STATUTS DISPONIBLES ===
-en_cours | a_faire_rapidement | en_attente | bloque | fait | annule${note}`
+=== AVAILABLE STATUSES ===
+en_cours | a_faire_rapidement | en_attente | bloque | fait | annule
+
+# Note (Linux / Cowork): AgentDockyard handles VirtioFS access automatically.
+# If agent.exe (Windows) is not accessible, use the Python version:
+#   python /path/to/agent.py '{"action":"..."}'`
   );
 }
 

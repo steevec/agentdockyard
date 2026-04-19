@@ -5,6 +5,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'">
   <title>AgentDockyard</title>
   <link rel="stylesheet" href="style.css">
+  <script src="i18n.js"></script>
 </head>
 <body>
 <div id="app">
@@ -58,8 +59,9 @@
         </select>
       </div>
 
-      <div class="form-group" style="align-self:end">
-        <button type="submit" class="btn-primary">Ajouter</button>
+      <div class="form-group add-form-actions" style="align-self:end;display:flex;gap:8px">
+        <button type="submit" class="btn-primary" id="f-submit">Ajouter</button>
+        <button type="button" class="btn-secondary" id="f-cancel">Annuler</button>
       </div>
 
       <div class="form-group add-form-2">
@@ -145,6 +147,11 @@
           <label><input type="radio" name="theme" value="dark"> &#x1F319; Dark</label>
           <label><input type="radio" name="theme" value="light"> &#x2600;&#xFE0F; Light (beige)</label>
         </div>
+      </div>
+
+      <div class="settings-section">
+        <h3 id="cfg-lang-title">Langue</h3>
+        <select id="cfg-language" style="width:100%;margin-top:4px"></select>
       </div>
 
       <div class="settings-section">
@@ -326,31 +333,17 @@
         </p>
 
         <div class="guide-block">
-          <h4>&#x1F4C1; Chemin du script AgentDockyard</h4>
-          <div class="guide-sub">Chemin detecte automatiquement pour votre installation&nbsp;:</div>
+          <h4 id="guide-prompt-path-title">&#x1F4C1; Chemin du script AgentDockyard</h4>
+          <div class="guide-sub" id="guide-prompt-path-desc">Chemin detecte automatiquement pour votre installation :</div>
           <div class="guide-code" id="guide-agent-path">chargement...</div>
-          <button class="btn-copy" data-copy-from="guide-agent-path">&#x1F4CB; Copier le chemin</button>
+          <button class="btn-copy" id="btn-copy-path" data-copy-from="guide-agent-path">&#x1F4CB; Copier le chemin</button>
         </div>
 
         <div class="guide-block">
-          <h4>&#x1F916; Claude Code</h4>
-          <div class="guide-sub">A ajouter dans votre <code>CLAUDE.md</code> :</div>
-          <div class="guide-code" id="guide-claude-code"></div>
-          <button class="btn-copy" data-copy-from="guide-claude-code">&#x1F4CB; Copier</button>
-        </div>
-
-        <div class="guide-block">
-          <h4>&#x2699;&#xFE0F; Claude Cowork</h4>
-          <div class="guide-sub">Version pour Claude Cowork (Linux / VirtioFS) :</div>
-          <div class="guide-code" id="guide-claude-cowork"></div>
-          <button class="btn-copy" data-copy-from="guide-claude-cowork">&#x1F4CB; Copier</button>
-        </div>
-
-        <div class="guide-block">
-          <h4>&#x2708;&#xFE0F; Autres agents (Copilot, Codex, ...)</h4>
-          <div class="guide-sub">Version generique &mdash; remplacez <code>NOM-DE-TON-AGENT</code> par l'identifiant de votre agent :</div>
-          <div class="guide-code" id="guide-generic"></div>
-          <button class="btn-copy" data-copy-from="guide-generic">&#x1F4CB; Copier</button>
+          <h4 id="guide-prompt-unified-title">&#x1F916; Tous les agents</h4>
+          <div class="guide-sub" id="guide-prompt-unified-desc">A ajouter dans votre CLAUDE.md / prompt système. Remplacez NOM-DE-VOTRE-AGENT par l'identifiant de votre agent :</div>
+          <div class="guide-code" id="guide-unified"></div>
+          <button class="btn-copy" id="btn-copy-unified" data-copy-from="guide-unified">&#x1F4CB; Copier</button>
         </div>
 
         <div class="guide-block">
