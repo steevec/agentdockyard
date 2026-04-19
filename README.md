@@ -1,145 +1,229 @@
 # AgentDockyard
 
 <p align="left">
-  <a href="https://github.com/steevec/agentdockyard/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/steevec/agentdockyard?display_name=tag&sort=semver&color=6366f1"></a>
-  <a href="https://github.com/steevec/agentdockyard/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/steevec/agentdockyard/total?color=4ade80"></a>
+  <a href="https://github.com/steevec/agentdockyard/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/steevec/agentdockyard?display_name=tag&sort=semver&color=6366f1"></a>
+  <a href="https://github.com/steevec/agentdockyard/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/steevec/agentdockyard/total?color=22c55e"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/steevec/agentdockyard?color=818cf8"></a>
-  <img alt="Platform" src="https://img.shields.io/badge/platform-Windows-blue">
+  <img alt="Platform" src="https://img.shields.io/badge/platform-Windows-3b82f6">
   <a href="https://github.com/steevec/agentdockyard/issues"><img alt="Issues" src="https://img.shields.io/github/issues/steevec/agentdockyard?color=f87171"></a>
 </p>
 
-**Supervise your AI agents' tasks from a local desktop dashboard.**
+**A local task hub for AI coding agents.**
 
-Track in real time what Claude Code, Claude Cowork, Copilot, Codex (or any other AI agent) are doing across your projects — all stored 100% locally.
+AgentDockyard helps you keep track of what your AI agents are doing **without reopening every session**.
 
-> By [Steeve Cordier](https://sitecrea.fr/) — MIT License
+It works when you have **many different agents** working together, but also when you have **just one agent spread across many sessions**.  
+You can immediately see what is **in progress**, **blocked**, **waiting**, **done**, and **who claimed what**.
 
----
+Install the app, copy the prompt snippet shown in the built-in guide, paste it into your agent memory, and you're done. After that, your agents can create, update, claim, delegate, and close tasks on their own.
 
-## Table of contents
-
-- [Why](#why)
-- [Features](#features)
-- [Screenshots](#screenshots)
-- [Install](#install)
-- [Wire up your AI agents](#wire-up-your-ai-agents)
-- [Settings](#settings)
-- [Architecture](#architecture)
-- [Build from source](#build-from-source)
-- [FAQ](#faq)
-- [Contributing](#contributing)
-- [License](#license)
+> Local-first. No cloud dashboard. No account. No telemetry.  
+> By [Steeve Cordier](https://sitecrea.fr/) — MIT License.
 
 ---
 
-## Why
+<p align="center">
+  <img src="docs/screenshots/agentdockyard-dark-overview.svg" alt="AgentDockyard dark mode overview" width="900">
+</p>
 
-If you run several AI agents in parallel — one editing code, another closing Linear tickets, another updating a doc — it quickly becomes impossible to answer:
+## Why this exists
 
-- *What is each agent doing right now?*
-- *Which tasks did they finish? Which ones are blocked?*
-- *Who's already claimed this task, so I don't spin up a second agent on it?*
+When you run several AI sessions in parallel, the real problem is not generating code.  
+It is **remembering the state of the work**.
 
-AgentDockyard solves this with a shared local SQLite database and a tiny desktop dashboard. Each agent declares its tasks via a one-liner CLI; you see everything update in real time.
+Questions pile up fast:
 
-Built for a single developer's workflow, not a team/cloud product. If that matches how you work, it might fit you.
+- Which session is still working on something?
+- Which task is blocked and needs input?
+- Which task is finished already?
+- Which agent already picked up that item?
+- What did the overnight or scheduled agent actually do?
+
+AgentDockyard gives you one local dashboard for all of that.
+
+It is especially useful for:
+
+- solo developers running **one agent in many parallel sessions**
+- developers juggling **Claude Code, Claude Cowork, Codex, Copilot, scripts, or scheduled jobs**
+- setups where **one agent supervises and delegates work** while others execute it
+- workflows where you want a **shared, lightweight task hub** instead of a full SaaS project tool
 
 ---
 
-## Features
+## In 30 seconds
 
-- **Real-time dashboard** — refreshes instantly whenever any agent writes to the shared database
-- **Dark & Light themes** — neutral dark / warm beige, switchable from the header
-- **Claim system** — know which agent is currently working on a task, with auto-expiry
-- **Built-in prompt guide** — copy-paste ready CLI instructions for Claude Code, Cowork, Copilot, Codex…
-- **Full settings panel** — purge rules, refresh rate, multi-screen window placement, custom agents list
-- **100% local SQLite** — no cloud, no telemetry, no account
-- **Auto-update** via GitHub Releases (can be disabled)
-- **Zero runtime dependencies** — the installer bundles everything; no Python or extra tools to install
+1. **Install AgentDockyard on Windows**
+2. Open **Settings / Guide** and copy the prompt snippet + executable path prepared by the app
+3. Paste that snippet into the memory or system instructions of your AI agents
+
+From there, the agents can report work automatically with a one-line CLI call:
+
+```bash
+"C:\Program Files\AgentDockyard\resources\agent.exe" "{\"action\":\"ajouter\",\"agent\":\"claude-code\",\"repo\":\"my-project\",\"sujet\":\"Fix checkout bug\",\"statut\":\"en_cours\"}"
+```
+
+That is the whole idea: **minimal setup, then autonomous tracking**.
 
 ---
 
-## Screenshots
+## What makes it different
 
-> Placeholder — actual screenshots will be added once the UI is frozen.
+### Useful even with only one agent
 
-| Dark mode | Light mode | Guide panel (copy-ready prompts) |
-|---|---|---|
-| *coming soon* | *coming soon* | *coming soon* |
+Most task tools assume a team.
+
+AgentDockyard also makes sense when you are alone but running the same agent in multiple terminals, branches, or scheduled sessions.  
+Instead of reopening each conversation to remember what was happening, you get one consolidated view.
+
+### Agents can coordinate through it
+
+One agent can create or dispatch a batch of tasks.  
+Another agent can pick up a waiting task, update progress, add notes, or close it.
+
+That makes AgentDockyard useful not only as a personal dashboard, but as a **small local coordination layer between agents**.
+
+### No heavy integration work
+
+There is no need to build a backend, host a service, or wire a cloud API before it becomes useful.
+
+The intended workflow is simple:
+
+- install the desktop app
+- copy the prompt snippet suggested by the app
+- paste it into your agent memory
+- let the agents write to the task hub automatically
+
+---
+
+## Typical workflows
+
+### 1) One agent, many sessions
+
+You have 6 Claude Code sessions open across multiple repos.  
+Each session creates and updates tasks as it works.  
+You keep one clean overview of what is still active, what is blocked, and what is already done.
+
+### 2) One supervisor agent, several executor agents
+
+A planning or supervisor agent breaks down a migration into subtasks.  
+Other agents pick up the waiting items and move them forward.  
+You can see delegation, claims, progress, and completion from one place.
+
+### 3) Overnight or scheduled work
+
+A scheduled agent runs during the night or while you are away.  
+In the morning, you do not need to inspect logs or reopen sessions first: the dashboard already shows what was created, updated, blocked, or completed.
+
+---
+
+## Screenshot
+
+<p align="center">
+  <img src="docs/screenshots/agentdockyard-dark-overview.svg" alt="AgentDockyard dark mode grouped by repo and agent" width="900">
+</p>
+
+Dark and light themes are both available in the app.
+
+---
+
+## Core features
+
+- **Single local dashboard** for tasks created by AI agents
+- **Real-time refresh** when agents write to the shared SQLite database
+- **Grouped view by repository and agent**
+- **Clear statuses**: urgent, in progress, waiting, blocked, cancelled, done
+- **Claim system** to show who owns a task right now, with expiry support
+- **Notes and context on each task** so the next session can understand the state quickly
+- **Dark and light themes**
+- **Built-in guide panel** with ready-to-paste prompt instructions
+- **Editable agents list** for custom agents, scripts, and identities
+- **100% local storage** with SQLite + local config
+- **No telemetry, no account, no SaaS dependency**
+- **Auto-update through GitHub Releases** (can be disabled)
 
 ---
 
 ## Install
 
-### Windows (recommended)
+### Windows
 
-1. Grab **`AgentDockyard-Setup-x.y.z.exe`** from the [latest release](https://github.com/steevec/agentdockyard/releases/latest).
-2. Double-click — installation creates desktop + start-menu shortcuts automatically.
-3. Launch AgentDockyard from the start menu.
+1. Download **`AgentDockyard-Setup-x.y.z.exe`** from the [latest release](https://github.com/steevec/agentdockyard/releases/latest)
+2. Install it normally
+3. Launch AgentDockyard
+4. Open the built-in guide or settings panel to get the executable path and the prompt snippet for your agents
 
-A **portable** build (`AgentDockyard-Portable-x.y.z.exe`) is also published — no install, just run.
+A **portable** build is also available as `AgentDockyard-Portable-x.y.z.exe`.
 
-The installer is currently **unsigned**, so Windows SmartScreen will ask you to confirm on the first launch. Code signing is on the [roadmap](https://github.com/steevec/agentdockyard/issues).
+The installer is currently **unsigned**, so Windows SmartScreen may ask for confirmation on first launch.
 
 ### macOS / Linux
 
-Not packaged yet — tracked in [issue #TBD](https://github.com/steevec/agentdockyard/issues). PRs welcome.
+Not packaged yet.  
+The desktop release flow currently targets Windows, but the underlying idea and CLI usage are not Windows-only.
 
 ---
 
-## Wire up your AI agents
+## Connect your agents
 
-Launch AgentDockyard → click **📖 Guide** in the header → **Prompt IA** tab.
-Copy the block matching your agent (Claude Code, Cowork, Copilot…) and paste it into the agent's `CLAUDE.md` / system prompt. The path to the bundled `agent.exe` is injected automatically.
+Inside the app, open the **Guide** panel.
 
-Then, from the agent's shell:
+You will find copy-ready instructions for integrating AgentDockyard with your agent memory or system prompt.  
+The app also exposes the path to the bundled executable so you do not have to guess it.
+
+Typical examples include:
+
+- Claude Code
+- Claude Cowork
+- Codex
+- Copilot
+- custom scripts
+- scheduled automation jobs
+
+Example commands:
 
 ```bash
-# Agent announces a new task
-"C:\Program Files\AgentDockyard\resources\agent.exe" '{"action":"ajouter","agent":"claude-code","repo":"my-project","sujet":"Fix bug X","statut":"en_cours"}'
+# Create a task
+"C:\Program Files\AgentDockyard\resources\agent.exe" "{\"action\":\"ajouter\",\"agent\":\"claude-code\",\"repo\":\"my-project\",\"sujet\":\"Fix bug X\",\"statut\":\"en_cours\"}"
 
-# Agent updates progress
-"C:\Program Files\AgentDockyard\resources\agent.exe" '{"action":"modifier","id":42,"note":"Step 1 done, running tests"}'
+# Update a task
+"C:\Program Files\AgentDockyard\resources\agent.exe" "{\"action\":\"modifier\",\"id\":42,\"note\":\"Step 1 done, running tests\"}"
 
-# Agent closes the task with a summary
-"C:\Program Files\AgentDockyard\resources\agent.exe" '{"action":"cloturer","id":42,"note":"Shipped in PR #123"}'
+# Close a task
+"C:\Program Files\AgentDockyard\resources\agent.exe" "{\"action\":\"cloturer\",\"id\":42,\"note\":\"Merged in PR #123\"}"
 ```
 
-The full command reference lives in the in-app guide and in [`agent.py`](agent.py).
+The full command reference lives in the app guide and in [`agent.py`](agent.py).
 
-### Statuses
+---
+
+## Statuses
 
 | Value | Meaning |
 |---|---|
+| `urgent` | Needs attention first |
 | `en_cours` | Currently being worked on |
-| `a_faire_rapidement` | Urgent, pick up next |
-| `bloque` | Stuck — needs input or decision |
-| `en_attente` | Paused, will resume later |
-| `fait` | Done, with a summary note |
-| `annule` | Cancelled, no summary needed |
+| `en_attente` | Waiting for another task, input, or timing |
+| `bloque` | Blocked |
+| `annule` | Cancelled |
+| `fait` | Completed |
 
 ---
 
-## Settings
+## Data, config, and privacy
 
-Everything is editable in the **⚙️ Settings** panel:
+Everything stays local.
 
-- **Appearance** — dark/light theme
-- **Auto-purge** — remove `fait`/`annule` tasks older than N days (default 90)
-- **Claim expiry** — auto-release claims after N hours (default 24)
-- **Refresh** — interval, whether to show `fait`/`annule`, cap per group
-- **Window** — remember position across restarts, or target a specific screen on multi-monitor setups
-- **Agents** — edit the list of known agents (emoji + id + label) shown in dropdowns
-- **Database** — open the data folder, export all tasks as JSON
-- **About** — check for updates, open the GitHub repo
+- **Config**: `%APPDATA%\AgentDockyard\config.json`
+- **Database**: `%APPDATA%\AgentDockyard\tasks.db`
 
-Settings are stored in `%APPDATA%\AgentDockyard\config.json`. The SQLite database lives next to it as `tasks.db`.
+There is no hosted dashboard and no required account.  
+Network access is only relevant for optional update checks against GitHub Releases.
 
 ---
 
 ## Architecture
 
-```
+```text
  ┌────────────────────────────────┐
  │  Renderer (HTML/CSS/JS)        │
  │  theme, panels, task cards     │
@@ -157,18 +241,10 @@ Settings are stored in `%APPDATA%\AgentDockyard\config.json`. The SQLite databas
                                 (Claude Code, Cowork, Copilot, ...)
 ```
 
-- **Electron renderer** — dashboard UI, zero business logic
-- **Electron main** — window lifecycle, config JSON, multi-screen placement, auto-updater, watches `tasks.db` for external writes
-- **`agent.exe`** — a PyInstaller-compiled standalone binary (no Python required on the target machine). Reads/writes `tasks.db` on behalf of AI agents via CLI
-- **`tasks.db`** — SQLite, with a VirtioFS fallback for Linux-side agents (Claude Cowork) when the same DB is shared with a Windows host
-
-Data locations:
-
-| OS | Path |
-|---|---|
-| Windows | `%APPDATA%\AgentDockyard\` |
-| macOS *(planned)* | `~/Library/Application Support/AgentDockyard/` |
-| Linux *(planned)* | `~/.config/AgentDockyard/` |
+- **Electron renderer**: dashboard UI
+- **Electron main**: window lifecycle, config JSON, multi-screen placement, auto-updater, DB watching
+- **`agent.exe`**: standalone CLI used by agents to read and write tasks
+- **`tasks.db`**: local SQLite task store
 
 ---
 
@@ -177,8 +253,8 @@ Data locations:
 ### Prerequisites
 
 - **Node.js 20+**
-- **Python 3.8+** with `pip install pyinstaller` (only needed to build the `.exe`; end users don't need Python)
-- **Windows** (macOS/Linux build is not yet wired up)
+- **Python 3.8+** with `pip install pyinstaller` to build `agent.exe`
+- **Windows** for the packaged desktop build flow
 
 ### Commands
 
@@ -186,44 +262,49 @@ Data locations:
 git clone https://github.com/steevec/agentdockyard.git
 cd agentdockyard
 npm install
-npm start                 # run in dev
-npm run build:agent       # compile agent.py -> dist-agent/agent.exe
-npm run build             # everything: agent.exe + NSIS installer + portable
+npm start
+npm run build:agent
+npm run build
 ```
 
-Artefacts land in `dist/`:
-- `AgentDockyard-Setup-x.y.z.exe` — NSIS installer
-- `AgentDockyard-Portable-x.y.z.exe` — portable
-- `latest.yml` — consumed by `electron-updater` for auto-updates
+Artifacts land in `dist/`:
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for dev environment caveats (including a known workaround when running under Claude Code).
+- `AgentDockyard-Setup-x.y.z.exe`
+- `AgentDockyard-Portable-x.y.z.exe`
+- `latest.yml`
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for local development details.
 
 ---
 
 ## FAQ
 
-**Do I need Python installed to use the app?**
-No. `agent.exe` is bundled with the installer and runs standalone. Python is only needed if you rebuild from source.
+**Do I need Python installed to use the app?**  
+No. End users use the bundled `agent.exe`. Python is only needed if you rebuild from source.
 
-**Does it phone home?**
-Only for checking GitHub for updates (off if `autoUpdater` is disabled in the code or you block network). No analytics, no telemetry, no cloud sync.
+**Is this only useful for teams of agents?**  
+No. One of the main use cases is exactly the opposite: one developer, one main agent, many sessions.
 
-**Can multiple users share the same `tasks.db`?**
-Yes, e.g. via a shared network drive — with the caveat that SQLite's concurrency model allows only one writer at a time. For heavy concurrent use, a proper DB would be better.
+**Does it send data to the cloud?**  
+No. Tasks and config stay local. Only update checks may contact GitHub Releases.
 
-**Windows Defender flags the installer — is that a problem?**
-The installer is unsigned (signing costs ~€300/year for an EV cert). Defender SmartScreen will warn on first run; clicking "Run anyway" is safe. Signed releases are [on the roadmap](https://github.com/steevec/agentdockyard/issues).
+**Can different kinds of agents use it?**  
+Yes. It is designed for mixed setups: Claude Code, Claude Cowork, Codex, Copilot, scripts, or scheduled jobs.
 
-**Why PyInstaller and not rewriting `agent.py` in Node?**
-`agent.py` is the source of truth used by all the agent integrations in the author's workflow. Having a single Python implementation keeps both the bundled `agent.exe` and the raw `agent.py` (for environments without the installer, e.g. Linux Cowork) in perfect sync.
+**Can one agent create tasks for another?**  
+Yes. That is one of the intended workflows.
+
+**Why not just use a TODO app?**  
+Because the point here is not generic project management. The point is giving AI agents a very small shared protocol so they can create, update, and close work items autonomously.
 
 ---
 
 ## Contributing
 
-Bug reports, feature ideas, and PRs are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for how to build locally and the coding conventions.
+Bug reports, ideas, and pull requests are welcome.  
+See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup and conventions.
 
-For anything security-sensitive, see [SECURITY.md](SECURITY.md).
+For security-sensitive topics, see [SECURITY.md](SECURITY.md).
 
 ---
 
