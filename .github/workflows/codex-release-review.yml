@@ -1,0 +1,109 @@
+name: Codex release review
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag a analyser (optionnel, ex: v1.2.0)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  codex_release_review:
+    name: Review published release with Codex
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Resolve ref to checkout
+        id: ref
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "ref=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+            echo "tag_name=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+            echo "release_name=${{ github.event.release.name }}" >> "$GITHUB_OUTPUT"
+            echo "release_url=${{ github.event.release.html_url }}" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ inputs.tag }}" ]; then
+            echo "ref=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+            echo "tag_name=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+            echo "release_name=Manual Codex review" >> "$GITHUB_OUTPUT"
+            echo "release_url=https://github.com/${{ github.repository }}/releases/tag/${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+            echo "tag_name=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+            echo "release_name=Manual Codex review" >> "$GITHUB_OUTPUT"
+            echo "release_url=https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout release ref
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ steps.ref.outputs.ref }}
+          fetch-depth: 0
+
+      - name: Check OPENAI_API_KEY is configured
+        shell: bash
+        run: |
+          if [ -z "${{ secrets.OPENAI_API_KEY }}" ]; then
+            echo "Missing repository secret: OPENAI_API_KEY" >&2
+            exit 1
+          fi
+
+      - name: Write release context for Codex
+        shell: bash
+        run: |
+          mkdir -p .github/codex/context
+          cat > .github/codex/context/release-context.md <<EOF
+          # Release context
+
+          - Repository: ${{ github.repository }}
+          - Tag: ${{ steps.ref.outputs.tag_name }}
+          - Release name: ${{ steps.ref.outputs.release_name }}
+          - Release URL: ${{ steps.ref.outputs.release_url }}
+          - Event: ${{ github.event_name }}
+          - Ref checked out: ${{ steps.ref.outputs.ref }}
+          EOF
+
+      - name: Run Codex
+        id: run_codex
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt-file: .github/codex/prompts/release.md
+          output-file: codex-release-review.md
+          safety-strategy: drop-sudo
+          sandbox: read-only
+
+      - name: Add review to workflow summary
+        if: always()
+        shell: bash
+        run: |
+          echo "# Codex release review" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Tag: \`${{ steps.ref.outputs.tag_name }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Release: ${{ steps.ref.outputs.release_name }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- URL: ${{ steps.ref.outputs.release_url }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -f codex-release-review.md ]; then
+            cat codex-release-review.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "_No Codex report file produced._" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload Codex review artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: codex-release-review-${{ steps.ref.outputs.tag_name }}
+          path: |
+            codex-release-review.md
+            .github/codex/context/release-context.md
+          if-no-files-found: warn
+          retention-days: 30
