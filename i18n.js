@@ -167,6 +167,13 @@ window.I18N = {
     // Confirm
     confirm_delete: 'Permanently delete task #ID?',
     confirm_purge: 'Clear all done/cancelled tasks? This cannot be undone.',
+    // Theme labels
+    settings_theme_dark: 'Dark',
+    settings_theme_light: 'Light',
+    // Update banner
+    update_downloading: '⬇️ Downloading update…',
+    update_ready: '✅ Update ready',
+    update_install_btn: 'Restart & Install',
   },
 
   // ── Français ─────────────────────────────────────────────────────────────────
@@ -307,6 +314,11 @@ window.I18N = {
     toast_win_position_copied: '✅ Position actuelle copiée dans les champs',
     confirm_delete: 'Supprimer la tâche #ID définitivement ?',
     confirm_purge: 'Vider toutes les tâches fait/annulé clôturées ? Cette action est irréversible.',
+    settings_theme_dark: 'Sombre',
+    settings_theme_light: 'Clair',
+    update_downloading: '⬇️ Téléchargement de la mise à jour…',
+    update_ready: '✅ Mise à jour prête',
+    update_install_btn: 'Redémarrer & Installer',
   },
 
   // ── Deutsch ──────────────────────────────────────────────────────────────────
@@ -447,6 +459,11 @@ window.I18N = {
     toast_win_position_copied: '✅ Aktuelle Position in Felder kopiert',
     confirm_delete: 'Aufgabe #ID dauerhaft löschen?',
     confirm_purge: 'Alle erledigten/abgebrochenen Aufgaben löschen? Diese Aktion ist unwiderruflich.',
+    settings_theme_dark: 'Dunkel',
+    settings_theme_light: 'Hell',
+    update_downloading: '⬇️ Update wird heruntergeladen…',
+    update_ready: '✅ Update bereit',
+    update_install_btn: 'Neu starten & Installieren',
   },
 
   // ── Español ──────────────────────────────────────────────────────────────────
@@ -587,6 +604,11 @@ window.I18N = {
     toast_win_position_copied: '✅ Posición actual copiada en los campos',
     confirm_delete: '¿Eliminar tarea #ID permanentemente?',
     confirm_purge: '¿Vaciar todas las tareas hecho/cancelado? Esta acción es irreversible.',
+    settings_theme_dark: 'Oscuro',
+    settings_theme_light: 'Claro',
+    update_downloading: '⬇️ Descargando actualización…',
+    update_ready: '✅ Actualización lista',
+    update_install_btn: 'Reiniciar e Instalar',
   },
 
   // ── Italiano ─────────────────────────────────────────────────────────────────
@@ -727,6 +749,11 @@ window.I18N = {
     toast_win_position_copied: '✅ Posizione attuale copiata nei campi',
     confirm_delete: 'Eliminare definitivamente il compito #ID?',
     confirm_purge: 'Svuotare tutti i compiti fatto/annullato? Questa azione è irreversibile.',
+    settings_theme_dark: 'Scuro',
+    settings_theme_light: 'Chiaro',
+    update_downloading: '⬇️ Download aggiornamento…',
+    update_ready: '✅ Aggiornamento pronto',
+    update_install_btn: 'Riavvia e Installa',
   },
 
   // ── Português ────────────────────────────────────────────────────────────────
@@ -867,6 +894,11 @@ window.I18N = {
     toast_win_position_copied: '✅ Posição atual copiada nos campos',
     confirm_delete: 'Excluir tarefa #ID permanentemente?',
     confirm_purge: 'Limpar todas as tarefas concluídas/canceladas? Esta ação é irreversível.',
+    settings_theme_dark: 'Escuro',
+    settings_theme_light: 'Claro',
+    update_downloading: '⬇️ Baixando atualização…',
+    update_ready: '✅ Atualização pronta',
+    update_install_btn: 'Reiniciar e Instalar',
   },
 
   // ── 中文 ─────────────────────────────────────────────────────────────────────
@@ -1007,6 +1039,11 @@ window.I18N = {
     toast_win_position_copied: '✅ 当前位置已复制到字段',
     confirm_delete: '永久删除任务 #ID？',
     confirm_purge: '清除所有已完成/已取消的任务？此操作不可撤销。',
+    settings_theme_dark: '深色',
+    settings_theme_light: '浅色',
+    update_downloading: '⬇️ 正在下载更新…',
+    update_ready: '✅ 更新已就绪',
+    update_install_btn: '重启并安装',
   },
 
   // ── 日本語 ───────────────────────────────────────────────────────────────────
@@ -1147,6 +1184,11 @@ window.I18N = {
     toast_win_position_copied: '✅ 現在位置をフィールドにコピーしました',
     confirm_delete: 'タスク #ID を完全に削除しますか？',
     confirm_purge: 'すべての完了/キャンセルタスクを削除しますか？この操作は元に戻せません。',
+    settings_theme_dark: 'ダーク',
+    settings_theme_light: 'ライト',
+    update_downloading: '⬇️ アップデートをダウンロード中…',
+    update_ready: '✅ アップデート準備完了',
+    update_install_btn: '再起動してインストール',
   },
 
   // ── हिन्दी ───────────────────────────────────────────────────────────────────
@@ -1287,6 +1329,11 @@ window.I18N = {
     toast_win_position_copied: '✅ वर्तमान स्थिति फ़ील्ड में कॉपी की गई',
     confirm_delete: 'कार्य #ID को स्थायी रूप से हटाएं?',
     confirm_purge: 'सभी पूर्ण/रद्द कार्यों को हटाएं? यह क्रिया अपरिवर्तनीय है।',
+    settings_theme_dark: 'डार्क',
+    settings_theme_light: 'लाइट',
+    update_downloading: '⬇️ अपडेट डाउनलोड हो रहा है…',
+    update_ready: '✅ अपडेट तैयार है',
+    update_install_btn: 'पुनः आरंभ करें और इंस्टॉल करें',
   },
 
 }; // end window.I18N

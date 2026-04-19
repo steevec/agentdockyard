@@ -2,8 +2,8 @@
  * main.js - Electron main process
  * AgentDockyard - stockage SQLite via agent (Python en dev, .exe autonome en prod).
  *
- * En dev  : spawnSync('python', ['agent.py', payload, dbPath])
- * En prod : spawnSync(process.resourcesPath + '/agent.exe', [payload, dbPath])
+ * En dev  : spawn('python', ['agent.py', payload, dbPath])
+ * En prod : spawn(process.resourcesPath + '/agent.exe', [payload, dbPath])
  *           -> l'utilisateur n'a besoin de rien installer.
  *
  * Watcher sur tasks.db pour notifier le renderer quand un agent externe ecrit.
@@ -12,7 +12,7 @@
 const { app, BrowserWindow, ipcMain, screen, dialog, shell } = require('electron');
 const path            = require('path');
 const fs              = require('fs');
-const { spawnSync }   = require('child_process');
+const { spawnSync, spawn } = require('child_process');
 
 // electron-updater : lazy-load pour ne pas crasher en dev (il appelle app.getVersion() au require)
 let _autoUpdater = null;
@@ -23,27 +23,17 @@ function getAutoUpdater() {
   _autoUpdater.autoInstallOnAppQuit = true;
 
   _autoUpdater.on('update-available', (info) => {
-    if (!mainWindow) return;
-    const r = dialog.showMessageBoxSync(mainWindow, {
-      type: 'info',
-      title: 'Mise a jour disponible',
-      message: `AgentDockyard v${info.version} est disponible.\nVoulez-vous la telecharger ?`,
-      buttons: ['Telecharger', 'Plus tard'],
-      defaultId: 0,
-    });
-    if (r === 0) _autoUpdater.downloadUpdate();
+    // Telechargement silencieux, notification in-app uniquement
+    _autoUpdater.downloadUpdate().catch(() => {});
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('update-available', info.version);
+    }
   });
 
   _autoUpdater.on('update-downloaded', () => {
-    if (!mainWindow) return;
-    const r = dialog.showMessageBoxSync(mainWindow, {
-      type: 'info',
-      title: 'Pret a installer',
-      message: 'La mise a jour a ete telechargee.\nAgentDockyard va redemarrer pour l\'appliquer.',
-      buttons: ['Redemarrer', 'Plus tard'],
-      defaultId: 0,
-    });
-    if (r === 0) _autoUpdater.quitAndInstall();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('update-downloaded');
+    }
   });
 
   _autoUpdater.on('error', (err) => {
@@ -166,31 +156,50 @@ function detectPython() {
   return null;
 }
 
-// ─── Appel agent ──────────────────────────────────────────────────────────────
+// ─── Appel agent (async — ne bloque pas le main process ni la fenetre) ────────
 function callAgent(payload) {
-  let bin, args;
-  if (IS_PACKAGED) {
-    bin  = AGENT_EXE_PATH;
-    args = [JSON.stringify(payload), DB_PATH];
-  } else {
-    if (!PYTHON_CMD) return { statut: 'NOK', message: 'Python introuvable (mode dev)' };
-    bin  = PYTHON_CMD;
-    args = [AGENT_SCRIPT_DEV, JSON.stringify(payload), DB_PATH];
-  }
-  const result = spawnSync(bin, args, { encoding: 'utf8', timeout: 10000 });
-  if (result.error) {
-    console.error('callAgent spawn error:', result.error.message);
-    return { statut: 'NOK', message: result.error.message };
-  }
-  if (result.status !== 0) {
-    console.error('callAgent stderr:', result.stderr);
-  }
-  try {
-    return JSON.parse(result.stdout || '{}');
-  } catch (e) {
-    console.error('callAgent JSON parse error:', result.stdout, e.message);
-    return { statut: 'NOK', message: 'JSON invalide: ' + (result.stdout || '').slice(0, 120) };
-  }
+  return new Promise((resolve) => {
+    let bin, args;
+    if (IS_PACKAGED) {
+      bin  = AGENT_EXE_PATH;
+      args = [JSON.stringify(payload), DB_PATH];
+    } else {
+      if (!PYTHON_CMD) return resolve({ statut: 'NOK', message: 'Python introuvable (mode dev)' });
+      bin  = PYTHON_CMD;
+      args = [AGENT_SCRIPT_DEV, JSON.stringify(payload), DB_PATH];
+    }
+
+    let stdout = '';
+    let stderr = '';
+    let done   = false;
+
+    const timer = setTimeout(() => {
+      if (!done) { done = true; child.kill(); resolve({ statut: 'NOK', message: 'Timeout' }); }
+    }, 10000);
+
+    const child = spawn(bin, args);
+    child.stdout.on('data', d => { stdout += d; });
+    child.stderr.on('data', d => { stderr += d; });
+    child.on('close', (code) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      if (code !== 0) console.error('callAgent stderr:', stderr);
+      try {
+        resolve(JSON.parse(stdout || '{}'));
+      } catch (e) {
+        console.error('callAgent JSON parse error:', stdout, e.message);
+        resolve({ statut: 'NOK', message: 'JSON invalide: ' + stdout.slice(0, 120) });
+      }
+    });
+    child.on('error', (err) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      console.error('callAgent spawn error:', err.message);
+      resolve({ statut: 'NOK', message: err.message });
+    });
+  });
 }
 
 // ─── Fenetre ──────────────────────────────────────────────────────────────────
@@ -279,6 +288,7 @@ function createWindow() {
     },
   });
 
+  mainWindow.removeMenu();
   mainWindow.loadFile('index.html');
 
   const cfg = loadConfig();
@@ -384,14 +394,14 @@ app.on('window-all-closed', () => {
 });
 
 // ─── IPC : gestion des taches ─────────────────────────────────────────────────
-ipcMain.handle('get-tasks', () => {
-  const r = callAgent({ action: 'lister' });
+ipcMain.handle('get-tasks', async () => {
+  const r = await callAgent({ action: 'lister' });
   return r.taches || [];
 });
 
-ipcMain.handle('add-task', (event, d) => {
+ipcMain.handle('add-task', async (event, d) => {
   lastOwnWrite = Date.now();
-  const r = callAgent({
+  const r = await callAgent({
     action:   'ajouter',
     agent:    d.agent    || '',
     repo:     d.repo     || '',
@@ -403,44 +413,44 @@ ipcMain.handle('add-task', (event, d) => {
   return { id: r.id };
 });
 
-ipcMain.handle('update-task', (event, d) => {
+ipcMain.handle('update-task', async (event, d) => {
   lastOwnWrite = Date.now();
   const payload = { action: 'modifier', id: d.id };
   const allowed = ['agent','repo','sujet','contexte','note','statut'];
   for (const k of allowed) {
     if (d[k] !== undefined) payload[k] = d[k];
   }
-  const r = callAgent(payload);
+  const r = await callAgent(payload);
   return { changes: r.statut === 'OK' ? 1 : 0 };
 });
 
-ipcMain.handle('close-task', (event, { id, note }) => {
+ipcMain.handle('close-task', async (event, { id, note }) => {
   lastOwnWrite = Date.now();
-  const r = callAgent({ action: 'cloturer', id, note: note || '' });
+  const r = await callAgent({ action: 'cloturer', id, note: note || '' });
   return { changes: r.statut === 'OK' ? 1 : 0 };
 });
 
-ipcMain.handle('delete-task', (event, id) => {
+ipcMain.handle('delete-task', async (event, id) => {
   lastOwnWrite = Date.now();
-  const r = callAgent({ action: 'annuler', id });
+  const r = await callAgent({ action: 'annuler', id });
   return { changes: r.statut === 'OK' ? 1 : 0 };
 });
 
-ipcMain.handle('claim-task', (event, { id, agent }) => {
+ipcMain.handle('claim-task', async (event, { id, agent }) => {
   lastOwnWrite = Date.now();
-  const r = callAgent({ action: 'reclamer', id, agent });
+  const r = await callAgent({ action: 'reclamer', id, agent });
   return { changes: r.statut === 'OK' ? 1 : 0 };
 });
 
-ipcMain.handle('release-task', (event, id) => {
+ipcMain.handle('release-task', async (event, id) => {
   lastOwnWrite = Date.now();
-  const r = callAgent({ action: 'liberer', id });
+  const r = await callAgent({ action: 'liberer', id });
   return { changes: r.statut === 'OK' ? 1 : 0 };
 });
 
-ipcMain.handle('set-status', (event, { id, statut }) => {
+ipcMain.handle('set-status', async (event, { id, statut }) => {
   lastOwnWrite = Date.now();
-  const r = callAgent({ action: 'changer_statut', id, statut });
+  const r = await callAgent({ action: 'changer_statut', id, statut });
   return r.statut === 'OK' ? { changes: 1 } : { error: r.message };
 });
 
@@ -452,10 +462,15 @@ ipcMain.handle('get-version',    () => app.getVersion());
 ipcMain.handle('get-config',  () => loadConfig());
 ipcMain.handle('save-config', (event, partial) => saveConfig(partial));
 
+// ─── IPC : mise a jour in-app ─────────────────────────────────────────────────
+ipcMain.handle('install-update', () => {
+  if (_autoUpdater) _autoUpdater.quitAndInstall();
+});
+
 // ─── IPC : purge / export / dossier / external ────────────────────────────────
-ipcMain.handle('purge-now', () => {
+ipcMain.handle('purge-now', async () => {
   lastOwnWrite = Date.now();
-  const r = callAgent({ action: 'purger_maintenant' });
+  const r = await callAgent({ action: 'purger_maintenant' });
   return r;
 });
 

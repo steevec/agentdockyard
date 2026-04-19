@@ -43,4 +43,9 @@ contextBridge.exposeInMainWorld('taskAPI', {
   // ─── Watcher externe ────────────────────────────────────────────────────────
   onDbChanged:  (cb) => ipcRenderer.on('db-changed', cb),
   offDbChanged: (cb) => ipcRenderer.removeListener('db-changed', cb),
+
+  // ─── Mises a jour in-app ────────────────────────────────────────────────────
+  onUpdateAvailable: (cb) => ipcRenderer.on('update-available',  (e, v) => cb(v)),
+  onUpdateDownloaded: (cb) => ipcRenderer.on('update-downloaded', () => cb()),
+  installUpdate: () => ipcRenderer.invoke('install-update'),
 });

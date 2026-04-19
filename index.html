@@ -141,136 +141,136 @@
     <div class="side-panel-body">
 
       <div class="settings-section">
-        <h3>Apparence</h3>
-        <label>Theme</label>
+        <h3 data-i18n="settings_appearance">Apparence</h3>
+        <label data-i18n="settings_theme_label">Theme</label>
         <div class="radio-group">
-          <label><input type="radio" name="theme" value="dark"> &#x1F319; Dark</label>
-          <label><input type="radio" name="theme" value="light"> &#x2600;&#xFE0F; Light (beige)</label>
+          <label><input type="radio" name="theme" value="dark"> &#x1F319; <span data-i18n="settings_theme_dark">Dark</span></label>
+          <label><input type="radio" name="theme" value="light"> &#x2600;&#xFE0F; <span data-i18n="settings_theme_light">Light</span></label>
         </div>
       </div>
 
       <div class="settings-section">
-        <h3 id="cfg-lang-title">Langue</h3>
+        <h3 data-i18n="settings_language">Langue</h3>
         <select id="cfg-language" style="width:100%;margin-top:4px"></select>
       </div>
 
       <div class="settings-section">
-        <h3>Purge automatique</h3>
+        <h3 data-i18n="settings_purge">Purge automatique</h3>
         <label class="toggle-row">
-          <span>Activer la purge automatique (90j par defaut)</span>
+          <span data-i18n="settings_purge_enabled">Activer la purge automatique (90j par defaut)</span>
           <input type="checkbox" id="cfg-purge-enabled">
         </label>
-        <label>Delai purge taches "fait" (jours)
+        <label><span data-i18n="settings_purge_fait">Delai purge taches "fait" (jours)</span>
           <input type="number" id="cfg-purge-fait" min="1" max="365">
         </label>
-        <label>Delai purge taches "annule" (jours)
+        <label><span data-i18n="settings_purge_annule">Delai purge taches "annule" (jours)</span>
           <input type="number" id="cfg-purge-annule" min="1" max="365">
         </label>
         <label class="toggle-row">
-          <span>Purger aussi au demarrage</span>
+          <span data-i18n="settings_purge_startup">Purger aussi au demarrage</span>
           <input type="checkbox" id="cfg-purge-demarrage">
         </label>
-        <button id="btn-purge-now" class="btn-danger">&#x1F5D1;&#xFE0F; Purger maintenant</button>
+        <button id="btn-purge-now" class="btn-danger" data-i18n="btn_purge_now">&#x1F5D1;&#xFE0F; Purger maintenant</button>
       </div>
 
       <div class="settings-section">
-        <h3>Reclamations</h3>
-        <label>Expiration automatique des reclamations (heures)
+        <h3 data-i18n="settings_claims">Reclamations</h3>
+        <label><span data-i18n="settings_claim_expiry">Expiration automatique des reclamations (heures)</span>
           <input type="number" id="cfg-reclam-heures" min="1" max="168">
         </label>
       </div>
 
       <div class="settings-section">
-        <h3>Interface</h3>
-        <label>Intervalle de refresh (secondes)
+        <h3 data-i18n="settings_interface">Interface</h3>
+        <label><span data-i18n="settings_refresh_secs">Intervalle de refresh (secondes)</span>
           <input type="number" id="cfg-refresh" min="5" max="300">
         </label>
         <label class="toggle-row">
-          <span>Afficher les taches "fait"</span>
+          <span data-i18n="settings_show_fait">Afficher les taches "fait"</span>
           <input type="checkbox" id="cfg-show-fait">
         </label>
         <label class="toggle-row">
-          <span>Afficher les taches "annule"</span>
+          <span data-i18n="settings_show_annule">Afficher les taches "annule"</span>
           <input type="checkbox" id="cfg-show-annule">
         </label>
-        <label>Nb max de taches par groupe (0 = illimite)
+        <label><span data-i18n="settings_max_group">Nb max de taches par groupe (0 = illimite)</span>
           <input type="number" id="cfg-max-groupe" min="0">
         </label>
       </div>
 
       <div class="settings-section">
-        <h3>Position &amp; taille de la fenetre</h3>
+        <h3 data-i18n="settings_window">Position &amp; taille de la fenetre</h3>
         <label class="toggle-row">
-          <span>Memoriser position/taille automatiquement</span>
+          <span data-i18n="settings_win_auto">Memoriser position/taille automatiquement</span>
           <input type="checkbox" id="cfg-win-auto-remember">
         </label>
         <div id="cfg-win-manual" class="subsection">
-          <p class="hint">Ou definissez manuellement :</p>
-          <label>Ecran cible
+          <p class="hint" data-i18n="settings_win_manual_hint">Ou definissez manuellement :</p>
+          <label><span data-i18n="settings_win_screen">Ecran cible</span>
             <select id="cfg-win-display"></select>
           </label>
           <div class="form-row">
-            <label>Position X (px)
+            <label><span data-i18n="settings_win_x">Position X (px)</span>
               <input type="number" id="cfg-win-x">
             </label>
-            <label>Position Y (px)
+            <label><span data-i18n="settings_win_y">Position Y (px)</span>
               <input type="number" id="cfg-win-y">
             </label>
           </div>
           <div class="form-row">
-            <label>Largeur (px)
+            <label><span data-i18n="settings_win_w">Largeur (px)</span>
               <input type="number" id="cfg-win-w" min="200">
             </label>
-            <label>Hauteur (px)
+            <label><span data-i18n="settings_win_h">Hauteur (px)</span>
               <input type="number" id="cfg-win-h" min="200">
             </label>
           </div>
           <label class="toggle-row">
-            <span>Largeur = largeur totale de l'ecran cible</span>
+            <span data-i18n="settings_win_fullwidth">Largeur = largeur totale de l'ecran cible</span>
             <input type="checkbox" id="cfg-win-fullwidth">
           </label>
           <label class="toggle-row">
-            <span>Hauteur = hauteur totale de l'ecran cible</span>
+            <span data-i18n="settings_win_fullheight">Hauteur = hauteur totale de l'ecran cible</span>
             <input type="checkbox" id="cfg-win-fullheight">
           </label>
           <label class="toggle-row">
-            <span>Activer la configuration manuelle</span>
+            <span data-i18n="settings_win_enable">Activer la configuration manuelle</span>
             <input type="checkbox" id="cfg-win-enabled">
           </label>
           <div id="cfg-win-screens-info" class="screens-info"></div>
-          <button id="btn-win-detect"       class="btn-secondary">&#x1F5A5;&#xFE0F; Detecter mes ecrans</button>
-          <button id="btn-win-save-current" class="btn-secondary">&#x1F4CC; Sauvegarder la position actuelle</button>
-          <button id="btn-win-apply-now"    class="btn-secondary">&#x25B6; Appliquer maintenant</button>
+          <button id="btn-win-detect"       class="btn-secondary" data-i18n="btn_detect_screens">&#x1F5A5;&#xFE0F; Detecter mes ecrans</button>
+          <button id="btn-win-save-current" class="btn-secondary" data-i18n="btn_save_position">&#x1F4CC; Sauvegarder la position actuelle</button>
+          <button id="btn-win-apply-now"    class="btn-secondary" data-i18n="btn_apply_now">&#x25B6; Appliquer maintenant</button>
         </div>
       </div>
 
       <div class="settings-section">
-        <h3>Agents connus</h3>
+        <h3 data-i18n="settings_agents">Agents connus</h3>
         <div class="agents-list" id="cfg-agents-list"></div>
-        <button id="btn-add-agent" class="btn-secondary">+ Ajouter un agent</button>
+        <button id="btn-add-agent" class="btn-secondary" data-i18n="btn_add_agent">+ Ajouter un agent</button>
       </div>
 
       <div class="settings-section">
-        <h3>Base de donnees</h3>
+        <h3 data-i18n="settings_database">Base de donnees</h3>
         <div class="path-display" id="cfg-db-path"></div>
-        <button id="btn-open-folder" class="btn-secondary">&#x1F4C2; Ouvrir le dossier</button>
-        <button id="btn-export-json" class="btn-secondary">&#x1F4BE; Exporter en JSON</button>
+        <button id="btn-open-folder" class="btn-secondary" data-i18n="btn_open_folder">&#x1F4C2; Ouvrir le dossier</button>
+        <button id="btn-export-json" class="btn-secondary" data-i18n="btn_export_json">&#x1F4BE; Exporter en JSON</button>
       </div>
 
       <div class="settings-section">
-        <h3>A propos</h3>
+        <h3 data-i18n="settings_about">A propos</h3>
         <p><strong>AgentDockyard</strong> v<span id="cfg-version">?</span></p>
         <p>Par <a href="#" id="link-sitecrea" style="color:var(--accent)">Steeve Cordier &mdash; sitecrea.fr</a></p>
         <p style="font-size:11px;color:var(--text-muted);margin-top:6px">Licence MIT &mdash; code source&nbsp;:
           <a href="#" id="link-github" style="color:var(--accent)">github.com/steevec/agentdockyard</a>
         </p>
-        <button id="btn-check-updates" class="btn-secondary" style="margin-top:10px">&#x1F504; Verifier les mises a jour</button>
+        <button id="btn-check-updates" class="btn-secondary" style="margin-top:10px" data-i18n="btn_check_updates">&#x1F504; Verifier les mises a jour</button>
       </div>
 
     </div>
     <div class="side-panel-footer">
-      <button id="settings-cancel" class="btn-secondary">Fermer</button>
-      <button id="settings-save"   class="btn-primary">&#x2705; Enregistrer</button>
+      <button id="settings-cancel" class="btn-secondary" data-i18n="btn_close">Fermer</button>
+      <button id="settings-save"   class="btn-primary"   data-i18n="btn_save_settings">&#x2705; Enregistrer</button>
     </div>
   </div>
 </div>
@@ -376,6 +376,13 @@
 </div>
 
 <div id="toast"></div>
+
+<!-- Banniere mise a jour -->
+<div id="update-banner" style="display:none">
+  <span id="update-banner-text"></span>
+  <button id="update-install-btn" style="display:none"></button>
+  <button id="update-dismiss-btn">✕</button>
+</div>
 
 <script src="renderer.js"></script>
 </body>

@@ -7,6 +7,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 _(nothing yet)_
 
+## [1.2.0] - 2026-04-19
+
+### Added
+- **In-app update banner** — instead of two blocking popups, a slim banner at the bottom shows download progress then a "Restart & Install" button. No more interruptions.
+
+### Fixed
+- **All Settings labels now translated** — every section title, checkbox, label, and button in the Settings panel is translated in all 9 languages (previously only the Language selector title was translated).
+- **Window drag no longer stutters** — `callAgent()` is now fully async (`spawn` instead of `spawnSync`), so the Electron main process is never blocked during tasks refresh or actions. Window movement is now smooth.
+
+### Changed
+- **Menu bar removed** — "File / Edit / View / Window / Help" native menu bar is gone. The app is a pure custom-chrome dashboard.
+
 ## [1.1.0] - 2026-04-19
 
 ### Added
@@ -54,6 +66,7 @@ First public release.
 - Installer is unsigned — Windows SmartScreen warns on first launch.
 - No telemetry, no crash reporting — issues are to be reported manually on GitHub.
 
-[Unreleased]: https://github.com/steevec/agentdockyard/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/steevec/agentdockyard/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/steevec/agentdockyard/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/steevec/agentdockyard/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/steevec/agentdockyard/releases/tag/v1.0.0

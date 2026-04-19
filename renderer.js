@@ -17,22 +17,14 @@ function t(key) {
 function statusLabel(s) { return t('statut_' + s) || s; }
 
 function applyI18n() {
-  // Header
-  const addToggle = document.getElementById('btn-add-toggle');
-  if (addToggle) addToggle.textContent = t('btn_add_task');
-  const btnTheme = document.getElementById('btn-theme');
-  if (btnTheme) btnTheme.title = t('btn_theme_title');
-  const btnSettings = document.getElementById('btn-settings');
-  if (btnSettings) btnSettings.title = t('btn_settings_title');
-  const btnGuide = document.getElementById('btn-guide');
-  if (btnGuide) btnGuide.title = t('btn_guide_title');
-  const btnRefresh = document.getElementById('btn-refresh');
-  if (btnRefresh) btnRefresh.title = t('btn_refresh_title');
-  // Add form
-  const fSubmit = document.getElementById('f-submit');
-  if (fSubmit) fSubmit.textContent = t('btn_submit_add');
-  const fCancel = document.getElementById('f-cancel');
-  if (fCancel) fCancel.textContent = t('btn_cancel');
+  // Scan générique : tous les éléments [data-i18n] → textContent
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.dataset.i18n;
+    const val = t(key);
+    if (val && val !== key) el.textContent = val;
+  });
+
+  // Placeholders
   const fRepo = document.getElementById('f-repo');
   if (fRepo) fRepo.placeholder = t('form_repo_ph');
   const fSujet = document.getElementById('f-sujet');
@@ -41,44 +33,24 @@ function applyI18n() {
   if (fContexte) fContexte.placeholder = t('form_contexte_ph');
   const fNote = document.getElementById('f-note');
   if (fNote) fNote.placeholder = t('form_note_ph');
-  // Update status select options in add form and modal
+
+  // Titles (tooltip)
+  const btnTheme = document.getElementById('btn-theme');
+  if (btnTheme) btnTheme.title = t('btn_theme_title');
+  const btnSettings = document.getElementById('btn-settings');
+  if (btnSettings) btnSettings.title = t('btn_settings_title');
+  const btnGuide = document.getElementById('btn-guide');
+  if (btnGuide) btnGuide.title = t('btn_guide_title');
+  const btnRefresh = document.getElementById('btn-refresh');
+  if (btnRefresh) btnRefresh.title = t('btn_refresh_title');
+
+  // Status select options
   updateStatusSelectOptions('f-statut', false);
   updateStatusSelectOptions('m-statut', true);
-  // Modal buttons
-  const mCancel = document.getElementById('modal-cancel');
-  if (mCancel) mCancel.textContent = t('modal_btn_cancel');
-  const mSave = document.getElementById('modal-save');
-  if (mSave) mSave.textContent = t('modal_btn_save');
-  // Settings panel title
-  const settingsTitle = document.querySelector('#settings-panel .side-panel-header h2');
-  if (settingsTitle) settingsTitle.textContent = t('settings_title');
-  const settingsClose = document.getElementById('settings-cancel');
-  if (settingsClose) settingsClose.textContent = t('btn_close');
-  const settingsSave = document.getElementById('settings-save');
-  if (settingsSave) settingsSave.textContent = t('btn_save_settings');
-  // Language section title
-  const cfgLangTitle = document.getElementById('cfg-lang-title');
-  if (cfgLangTitle) cfgLangTitle.textContent = t('settings_language');
-  // Guide panel
-  const guideTitle = document.querySelector('#guide-panel .side-panel-header h2');
-  if (guideTitle) guideTitle.textContent = t('guide_title');
-  const tabUsage = document.querySelector('.tab[data-tab="tab-usage"]');
-  if (tabUsage) tabUsage.textContent = t('guide_tab_usage');
-  const tabPrompt = document.querySelector('.tab[data-tab="tab-prompt"]');
-  if (tabPrompt) tabPrompt.textContent = t('guide_tab_prompt');
-  // Guide prompt elements
-  const gPathTitle = document.getElementById('guide-prompt-path-title');
-  if (gPathTitle) gPathTitle.textContent = t('guide_prompt_path_title');
-  const gPathDesc = document.getElementById('guide-prompt-path-desc');
-  if (gPathDesc) gPathDesc.textContent = t('guide_prompt_path_desc');
-  const btnCopyPath = document.getElementById('btn-copy-path');
-  if (btnCopyPath) btnCopyPath.textContent = t('btn_copy_path');
-  const gUnifiedTitle = document.getElementById('guide-prompt-unified-title');
-  if (gUnifiedTitle) gUnifiedTitle.textContent = t('guide_prompt_unified_title');
-  const gUnifiedDesc = document.getElementById('guide-prompt-unified-desc');
-  if (gUnifiedDesc) gUnifiedDesc.textContent = t('guide_prompt_unified_desc');
-  const btnCopyUnified = document.getElementById('btn-copy-unified');
-  if (btnCopyUnified) btnCopyUnified.textContent = t('btn_copy_prompt');
+
+  // Bannière mise à jour
+  const installBtn = document.getElementById('update-install-btn');
+  if (installBtn) installBtn.textContent = t('update_install_btn') || 'Restart & Install';
 }
 
 function updateStatusSelectOptions(selectId, includeFait) {
@@ -132,6 +104,24 @@ async function init() {
   resetRefreshTimer();
 
   window.taskAPI.onDbChanged(() => { showDot(true); refreshTasks(); });
+
+  // Bannière de mise à jour
+  if (window.taskAPI.onUpdateAvailable) {
+    window.taskAPI.onUpdateAvailable((version) => {
+      showUpdateBanner(t('update_downloading') || `Update v${version} downloading…`, false);
+    });
+  }
+  if (window.taskAPI.onUpdateDownloaded) {
+    window.taskAPI.onUpdateDownloaded(() => {
+      showUpdateBanner(t('update_ready') || 'Update ready — restart to install', true);
+    });
+  }
+  document.getElementById('update-dismiss-btn').addEventListener('click', () => {
+    document.getElementById('update-banner').style.display = 'none';
+  });
+  document.getElementById('update-install-btn').addEventListener('click', () => {
+    window.taskAPI.installUpdate();
+  });
 
   document.addEventListener('keydown', e => {
     if (e.key === 'F5')     { e.preventDefault(); refreshTasks(); }
@@ -860,6 +850,17 @@ en_cours | a_faire_rapidement | en_attente | bloque | fait | annule
 # If agent.exe (Windows) is not accessible, use the Python version:
 #   python /path/to/agent.py '{"action":"..."}'`
   );
+}
+
+// ─── Banniere mise a jour ─────────────────────────────────────────────────────
+function showUpdateBanner(msg, showInstall) {
+  const banner = document.getElementById('update-banner');
+  const text   = document.getElementById('update-banner-text');
+  const btn    = document.getElementById('update-install-btn');
+  if (!banner) return;
+  text.textContent = msg;
+  btn.style.display = showInstall ? 'inline-block' : 'none';
+  banner.style.display = 'flex';
 }
 
 // ─── Utilitaires ───────────────────────────────────────────────────────────────
