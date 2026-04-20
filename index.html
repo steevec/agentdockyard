@@ -29,6 +29,7 @@
   <!-- Corps -->
   <div id="main">
     <div id="tasks-panel">
+      <div id="widgets-container"></div>
       <div id="tasks-container">
         <div id="empty-state"><div class="icon">&#x23F3;</div><div>Chargement...</div></div>
       </div>
@@ -249,6 +250,13 @@
         <h3 data-i18n="settings_agents">Agents connus</h3>
         <div class="agents-list" id="cfg-agents-list"></div>
         <button id="btn-add-agent" class="btn-secondary" data-i18n="btn_add_agent">+ Ajouter un agent</button>
+      </div>
+
+      <div class="settings-section">
+        <h3 data-i18n="settings_widgets">Widgets d'affichage</h3>
+        <p class="hint" data-i18n="settings_widgets_hint">Affiche des infos personnalisees au-dessus des taches (texte fixe ou valeur recuperee depuis une URL).</p>
+        <div class="widgets-list" id="cfg-widgets-list"></div>
+        <button id="btn-add-widget" class="btn-secondary" data-i18n="btn_add_widget">+ Ajouter un widget</button>
       </div>
 
       <div class="settings-section">

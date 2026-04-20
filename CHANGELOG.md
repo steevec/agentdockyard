@@ -7,6 +7,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 _(nothing yet)_
 
+## [1.4.0] - 2026-04-20
+
+### Added
+- **Info widgets above the task list** — a new "Info widgets" section in Settings lets you pin custom lines above your tasks. Each widget can be either a fixed text or a URL that returns a short value (e.g. an endpoint that outputs "64 online"). URL widgets refresh on their own interval (10–3600 s, configurable per widget) and fetch through the main process to bypass the renderer's CSP. Widgets scroll with the task list, stack in order, and disappear under the header when you scroll down — great for at-a-glance numbers like connected users, uptime, build status, etc.
+
+### Fixed
+- **Closed-task order reversed** — when expanding the "N done" section inside a repo group, tasks are now sorted with the most recently closed at the top (previously shown in reverse order).
+
 ## [1.3.0] - 2026-04-19
 
 ### Added
@@ -71,7 +79,9 @@ First public release.
 - Installer is unsigned — Windows SmartScreen warns on first launch.
 - No telemetry, no crash reporting — issues are to be reported manually on GitHub.
 
-[Unreleased]: https://github.com/steevec/agentdockyard/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/steevec/agentdockyard/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/steevec/agentdockyard/compare/v1.3.0...v1.4.0
+[1.3.0]: https://github.com/steevec/agentdockyard/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/steevec/agentdockyard/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/steevec/agentdockyard/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/steevec/agentdockyard/releases/tag/v1.0.0

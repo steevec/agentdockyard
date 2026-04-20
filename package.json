@@ -1,7 +1,7 @@
 {
   "name": "agentdockyard",
   "productName": "AgentDockyard",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Superviseur de taches pour agents IA - Claude Code, Cowork, Copilot, Codex",
   "main": "main.js",
   "author": {

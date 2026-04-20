@@ -49,3 +49,6 @@ snapshots/
 CLAUDE.md
 AGENTS.md
 .github/copilot-instructions.md
+
+# ─── Memoire agent Claude Code (auto-memory) ─────────────────
+.claude/

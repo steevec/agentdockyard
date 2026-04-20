@@ -81,6 +81,10 @@ let refreshTimer     = null;
 let addBarOpen       = false;
 let previewFilename  = null;  // snapshot en cours d'apercu (null = pas en mode preview)
 
+let widgetsConfig    = [];
+let widgetValues     = new Map();  // idx -> derniere valeur recuperee (string)
+let widgetTimers     = new Map();  // idx -> setInterval id
+
 // ─── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
   currentConfig = await window.taskAPI.getConfig();
@@ -105,6 +109,7 @@ async function init() {
 
   await refreshTasks();
   resetRefreshTimer();
+  applyWidgetsFromConfig();
 
   window.taskAPI.onDbChanged(() => { showDot(true); refreshTasks(); });
 
@@ -271,6 +276,63 @@ function renderTasks(tasks) {
   }
 }
 
+// ─── Widgets d'affichage (au-dessus du flux de taches) ────────────────────────
+function applyWidgetsFromConfig() {
+  widgetsConfig = Array.isArray(currentConfig && currentConfig.widgets) ? currentConfig.widgets : [];
+  stopWidgetTimers();
+  widgetValues = new Map();
+  renderWidgets();
+  startWidgetTimers();
+}
+
+function stopWidgetTimers() {
+  for (const id of widgetTimers.values()) clearInterval(id);
+  widgetTimers.clear();
+}
+
+function startWidgetTimers() {
+  widgetsConfig.forEach((w, idx) => {
+    if (w && w.type === 'url' && w.url) {
+      fetchWidget(idx);
+      const secs = Math.max(10, Math.min(3600, parseInt(w.refresh_secondes, 10) || 60));
+      const t = setInterval(() => fetchWidget(idx), secs * 1000);
+      widgetTimers.set(idx, t);
+    }
+  });
+}
+
+async function fetchWidget(idx) {
+  const w = widgetsConfig[idx];
+  if (!w || w.type !== 'url' || !w.url) return;
+  try {
+    const r = await window.taskAPI.fetchWidgetUrl(w.url);
+    if (r && r.ok) widgetValues.set(idx, (r.value || '').slice(0, 300));
+    else           widgetValues.set(idx, '\u26A0 ' + ((r && r.error) || 'erreur'));
+  } catch (e) {
+    widgetValues.set(idx, '\u26A0 ' + e.message);
+  }
+  renderWidgets();
+}
+
+function renderWidgets() {
+  const container = document.getElementById('widgets-container');
+  if (!container) return;
+  if (!widgetsConfig.length) { container.innerHTML = ''; return; }
+  let h = '';
+  widgetsConfig.forEach((w, idx) => {
+    if (!w) return;
+    let value;
+    if (w.type === 'text') value = w.content || '';
+    else if (w.type === 'url') value = widgetValues.has(idx) ? widgetValues.get(idx) : '\u2026';
+    else return;
+    const label = (w.label && w.label.trim())
+      ? `<span class="widget-label">${esc(w.label)}</span>`
+      : '';
+    h += `<div class="widget-line widget-type-${esc(w.type)}">${label}<span class="widget-value">${esc(value)}</span></div>`;
+  });
+  container.innerHTML = h;
+}
+
 function renderRepoGroup(repo, agentsMap, opts) {
   const nom  = (repo === '_hors_repo_') ? 'Hors repo' : repo;
   const b64  = btoa(unescape(encodeURIComponent(repo)));
@@ -308,6 +370,11 @@ function renderRepoGroup(repo, agentsMap, opts) {
   }
 
   if (faites.length && (!opts || opts.showFait !== false)) {
+    faites.sort((a, b) => {
+      const da = a.date_cloture || a.date_creation || '';
+      const db = b.date_cloture || b.date_creation || '';
+      return db.localeCompare(da);
+    });
     const fVis = visibleFaites.has(repo);
     h += `<button class="btn-toggle-faites" onclick='toggleFaites(${j(repo)},${j(b64)})'>`;
     const doneLabel = faites.length > 1 ? t('repo_done_many') : t('repo_done_one');
@@ -565,6 +632,10 @@ function bindSettingsPanel() {
   document.getElementById('btn-add-agent').addEventListener('click', () => {
     addAgentRow({ id: '', label: '', emoji: '' });
   });
+
+  document.getElementById('btn-add-widget').addEventListener('click', () => {
+    addWidgetRow({ type: 'text', label: '', content: '', url: '', refresh_secondes: 60 });
+  });
 }
 
 async function openSettingsPanel() {
@@ -613,6 +684,9 @@ async function openSettingsPanel() {
   // Agents
   renderAgentsList(agentsConfig);
 
+  // Widgets
+  renderWidgetsList(currentConfig.widgets || []);
+
   // DB path + version
   const dbPath = await window.taskAPI.getDbPath();
   document.getElementById('cfg-db-path').textContent = dbPath;
@@ -655,6 +729,75 @@ function collectAgentsFromUI() {
   return out;
 }
 
+// ─── Widgets (UI parametres) ──────────────────────────────────────────────────
+function renderWidgetsList(widgets) {
+  const container = document.getElementById('cfg-widgets-list');
+  container.innerHTML = '';
+  for (const w of (widgets || [])) addWidgetRow(w);
+}
+
+function addWidgetRow(widget) {
+  const container = document.getElementById('cfg-widgets-list');
+  const w = widget || { type: 'text', label: '', content: '', url: '', refresh_secondes: 60 };
+  const row = document.createElement('div');
+  row.className = 'widget-row';
+  const typeTextLabel = t('widget_type_text') || 'Texte';
+  const typeUrlLabel  = t('widget_type_url')  || 'URL';
+  row.innerHTML = `
+    <div class="widget-row-line">
+      <select class="w-type">
+        <option value="text"${w.type === 'text' ? ' selected' : ''}>${esc(typeTextLabel)}</option>
+        <option value="url"${w.type === 'url' ? ' selected' : ''}>${esc(typeUrlLabel)}</option>
+      </select>
+      <input type="text" class="w-label" placeholder="${esc(t('widget_label_ph') || 'Libelle (optionnel)')}" value="${esc(w.label || '')}">
+      <button class="btn-remove" title="Supprimer">&times;</button>
+    </div>
+    <div class="widget-row-line">
+      <input type="text" class="w-content" value="${esc(w.type === 'url' ? (w.url || '') : (w.content || ''))}">
+      <input type="number" class="w-refresh" min="10" max="3600" value="${w.refresh_secondes || 60}" title="${esc(t('widget_refresh_tooltip') || 'Delai (sec) entre chaque requete URL')}">
+      <span class="w-refresh-suffix">s</span>
+    </div>
+  `;
+  const selType    = row.querySelector('.w-type');
+  const inpContent = row.querySelector('.w-content');
+  const inpRefresh = row.querySelector('.w-refresh');
+  const suffix     = row.querySelector('.w-refresh-suffix');
+  const updateMode = () => {
+    const isUrl = selType.value === 'url';
+    inpContent.placeholder = isUrl
+      ? (t('widget_url_ph')  || 'https://...')
+      : (t('widget_text_ph') || 'Texte a afficher...');
+    inpRefresh.style.display = isUrl ? '' : 'none';
+    suffix.style.display     = isUrl ? '' : 'none';
+  };
+  selType.addEventListener('change', updateMode);
+  updateMode();
+  row.querySelector('.btn-remove').addEventListener('click', () => row.remove());
+  container.appendChild(row);
+}
+
+function collectWidgetsFromUI() {
+  const rows = document.querySelectorAll('#cfg-widgets-list .widget-row');
+  const out = [];
+  rows.forEach(r => {
+    const type    = r.querySelector('.w-type').value;
+    const label   = r.querySelector('.w-label').value.trim();
+    const content = r.querySelector('.w-content').value.trim();
+    const refresh = parseInt(r.querySelector('.w-refresh').value, 10) || 60;
+    if (type === 'text' && content) {
+      out.push({ type: 'text', label, content });
+    } else if (type === 'url' && /^https?:\/\//i.test(content)) {
+      out.push({
+        type: 'url',
+        label,
+        url: content,
+        refresh_secondes: Math.max(10, Math.min(3600, refresh)),
+      });
+    }
+  });
+  return out;
+}
+
 async function saveSettings() {
   const win = readWindowFromUI();
   const patch = {
@@ -675,7 +818,8 @@ async function saveSettings() {
       max_par_groupe:   parseInt(document.getElementById('cfg-max-groupe').value, 10) || 0,
     },
     window: win,
-    agents: collectAgentsFromUI(),
+    agents:  collectAgentsFromUI(),
+    widgets: collectWidgetsFromUI(),
     language: (document.getElementById('cfg-language') || {}).value || currentLang,
   };
   currentConfig = await window.taskAPI.saveConfig(patch);
@@ -684,6 +828,7 @@ async function saveSettings() {
   applyTheme(currentConfig.theme || 'dark');
   applyI18n();
   populateAgentSelects();
+  applyWidgetsFromConfig();
   showToast(t('toast_settings_saved') || '\u2705 Settings saved', 'success');
   closeSidePanel('settings-overlay');
   resetRefreshTimer();

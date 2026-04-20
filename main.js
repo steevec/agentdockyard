@@ -12,6 +12,9 @@
 const { app, BrowserWindow, ipcMain, screen, dialog, shell } = require('electron');
 const path            = require('path');
 const fs              = require('fs');
+const http            = require('http');
+const https           = require('https');
+const { URL }         = require('url');
 const { spawnSync, spawn } = require('child_process');
 
 // electron-updater : lazy-load pour ne pas crasher en dev (il appelle app.getVersion() au require)
@@ -111,6 +114,7 @@ const CONFIG_DEFAULT = {
     fullWidth: false,
     fullHeight: false,
   },
+  widgets: [],
 };
 
 function deepMerge(base, patch) {
@@ -659,6 +663,56 @@ ipcMain.handle('open-external', (event, url) => {
   if (typeof url !== 'string') return;
   if (!/^https?:\/\//i.test(url)) return;
   shell.openExternal(url);
+});
+
+// ─── IPC : widgets (fetch URL cote main pour contourner CSP renderer) ─────────
+// Renvoie { ok, value, error }. Le body est limite a 8 Ko et trim pour eviter
+// qu une reponse volumineuse accidentelle ne pollue l UI.
+ipcMain.handle('fetch-widget-url', async (event, url) => {
+  if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) {
+    return { ok: false, error: 'URL invalide (http(s) requis)' };
+  }
+  let parsed;
+  try { parsed = new URL(url); } catch (e) { return { ok: false, error: 'URL malformee' }; }
+  const lib = parsed.protocol === 'https:' ? https : http;
+  const MAX_BYTES    = 8 * 1024;
+  const TIMEOUT_MS   = 5000;
+
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (r) => { if (done) return; done = true; resolve(r); };
+
+    const req = lib.get(url, { timeout: TIMEOUT_MS, headers: { 'User-Agent': 'AgentDockyard-Widget/1.0' } }, (res) => {
+      if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        res.resume();
+        finish({ ok: false, error: `Redirection ${res.statusCode} (non suivie)` });
+        return;
+      }
+      if (res.statusCode && res.statusCode >= 400) {
+        res.resume();
+        finish({ ok: false, error: `HTTP ${res.statusCode}` });
+        return;
+      }
+      let size = 0;
+      const chunks = [];
+      res.on('data', (c) => {
+        size += c.length;
+        if (size > MAX_BYTES) {
+          chunks.push(c.slice(0, MAX_BYTES - (size - c.length)));
+          req.destroy();
+        } else {
+          chunks.push(c);
+        }
+      });
+      res.on('end', () => {
+        const value = Buffer.concat(chunks).toString('utf8').trim();
+        finish({ ok: true, value });
+      });
+      res.on('error', (e) => finish({ ok: false, error: e.message }));
+    });
+    req.on('timeout', () => { req.destroy(); finish({ ok: false, error: 'Timeout' }); });
+    req.on('error', (e) => finish({ ok: false, error: e.message }));
+  });
 });
 
 ipcMain.handle('check-for-updates', async () => {
