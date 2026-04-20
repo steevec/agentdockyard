@@ -52,3 +52,6 @@ AGENTS.md
 
 # ─── Memoire agent Claude Code (auto-memory) ─────────────────
 .claude/
+
+# ─── Preparation candidature SignPath (local, non versionne) ─
+.signpath/

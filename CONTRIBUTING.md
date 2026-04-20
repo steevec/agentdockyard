@@ -113,6 +113,7 @@ Publishing a release:
 1. Bump `version` in [`package.json`](package.json), update [`CHANGELOG.md`](CHANGELOG.md).
 2. `git commit -am "Feat(Release)/ v1.1.0"` then tag: `git tag v1.1.0 && git push --tags`.
 3. The [`release.yml`](.github/workflows/release.yml) workflow picks up the tag, runs the full build on a Windows runner, and publishes the assets to a GitHub release.
+4. When the SignPath secrets are configured (see [docs/signing.md](docs/signing.md)), the installers are code-signed automatically as part of the same workflow — no extra manual step.
 
 ---
 

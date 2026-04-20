@@ -78,7 +78,9 @@
         }
       ],
       "icon": "assets/icon.ico",
-      "artifactName": "AgentDockyard-${version}-${arch}-${os}.${ext}"
+      "artifactName": "AgentDockyard-${version}-${arch}-${os}.${ext}",
+      "publisherName": "Steeve Cordier",
+      "legalTrademarks": "AgentDockyard is a trademark of Steeve Cordier"
     },
     "nsis": {
       "oneClick": false,
