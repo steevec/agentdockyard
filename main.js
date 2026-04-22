@@ -334,7 +334,7 @@ async function previewSnapshotTasks(filename) {
   if (!meta) return { ok: false, error: 'Nom de snapshot invalide' };
   const full = path.join(SNAPSHOTS_DIR, filename);
   if (!fs.existsSync(full)) return { ok: false, error: 'Snapshot introuvable' };
-  const r = await callAgent({ action: 'lister' }, full);
+  const r = await callAgent({ action: 'lister', inclure_fait: true, inclure_annule: true }, full);
   if (r && Array.isArray(r.taches)) {
     return {
       ok: true,
@@ -450,6 +450,12 @@ function createWindow() {
   });
 
   mainWindow.removeMenu();
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if ((input.key === 'F12' || (input.key === 'I' && input.control && input.shift)) && input.type === 'keyDown') {
+      mainWindow.webContents.toggleDevTools();
+      event.preventDefault();
+    }
+  });
   mainWindow.loadFile('index.html');
 
   const cfg = loadConfig();
@@ -559,7 +565,9 @@ app.on('window-all-closed', () => {
 
 // ─── IPC : gestion des taches ─────────────────────────────────────────────────
 ipcMain.handle('get-tasks', async () => {
-  const r = await callAgent({ action: 'lister' });
+  // L UI affiche les taches cloturees (fait) et annulees selon les preferences :
+  // le filtrage se fait cote renderer, on demande donc tout au backend.
+  const r = await callAgent({ action: 'lister', inclure_fait: true, inclure_annule: true });
   return r.taches || [];
 });
 
@@ -675,7 +683,7 @@ ipcMain.handle('fetch-widget-url', async (event, url) => {
   let parsed;
   try { parsed = new URL(url); } catch (e) { return { ok: false, error: 'URL malformee' }; }
   const lib = parsed.protocol === 'https:' ? https : http;
-  const MAX_BYTES    = 8 * 1024;
+  const MAX_BYTES    = 256 * 1024;
   const TIMEOUT_MS   = 5000;
 
   return new Promise((resolve) => {

@@ -306,8 +306,12 @@ async function fetchWidget(idx) {
   if (!w || w.type !== 'url' || !w.url) return;
   try {
     const r = await window.taskAPI.fetchWidgetUrl(w.url);
-    if (r && r.ok) widgetValues.set(idx, (r.value || '').slice(0, 300));
-    else           widgetValues.set(idx, '\u26A0 ' + ((r && r.error) || 'erreur'));
+    if (r && r.ok) {
+      const raw = r.value || '';
+      widgetValues.set(idx, w.allow_html ? raw : raw.slice(0, 300));
+    } else {
+      widgetValues.set(idx, '\u26A0 ' + ((r && r.error) || 'erreur'));
+    }
   } catch (e) {
     widgetValues.set(idx, '\u26A0 ' + e.message);
   }
@@ -318,19 +322,53 @@ function renderWidgets() {
   const container = document.getElementById('widgets-container');
   if (!container) return;
   if (!widgetsConfig.length) { container.innerHTML = ''; return; }
-  let h = '';
+  container.innerHTML = '';
   widgetsConfig.forEach((w, idx) => {
     if (!w) return;
     let value;
     if (w.type === 'text') value = w.content || '';
     else if (w.type === 'url') value = widgetValues.has(idx) ? widgetValues.get(idx) : '\u2026';
     else return;
-    const label = (w.label && w.label.trim())
-      ? `<span class="widget-label">${esc(w.label)}</span>`
-      : '';
-    h += `<div class="widget-line widget-type-${esc(w.type)}">${label}<span class="widget-value">${esc(value)}</span></div>`;
+
+    const line = document.createElement('div');
+    const isHtml = !!w.allow_html;
+    line.className = 'widget-line widget-type-' + w.type + (isHtml ? ' widget-line-html' : '');
+
+    if (w.label && w.label.trim()) {
+      const lab = document.createElement('span');
+      lab.className = 'widget-label';
+      lab.textContent = w.label;
+      line.appendChild(lab);
+    }
+
+    if (isHtml) {
+      const val = document.createElement('div');
+      val.className = 'widget-value-html';
+      val.innerHTML = value;
+      executeScriptsIn(val);
+      console.log('[widget]', idx, 'HTML rendered, length=', (value || '').length, 'first=', (value || '').slice(0, 80));
+      line.appendChild(val);
+    } else {
+      const val = document.createElement('span');
+      val.className = 'widget-value';
+      val.textContent = value;
+      line.appendChild(val);
+    }
+    container.appendChild(line);
   });
-  container.innerHTML = h;
+}
+
+// Re-execute <script> tags injected via innerHTML (browsers skip them otherwise).
+// Scripts executed here run in the global window context (even from a shadow root),
+// so they can use jQuery ($) exposed on window via assets/vendor/jquery.min.js.
+function executeScriptsIn(root) {
+  const scripts = root.querySelectorAll('script');
+  scripts.forEach((oldScript) => {
+    const newScript = document.createElement('script');
+    for (const attr of oldScript.attributes) newScript.setAttribute(attr.name, attr.value);
+    newScript.text = oldScript.textContent;
+    oldScript.parentNode.replaceChild(newScript, oldScript);
+  });
 }
 
 function renderRepoGroup(repo, agentsMap, opts) {
@@ -743,6 +781,8 @@ function addWidgetRow(widget) {
   row.className = 'widget-row';
   const typeTextLabel = t('widget_type_text') || 'Texte';
   const typeUrlLabel  = t('widget_type_url')  || 'URL';
+  const htmlLabel   = t('widget_html_label')   || 'HTML';
+  const htmlTooltip = t('widget_html_tooltip') || 'Rendu HTML brut (style, script, jQuery) — desactive l echappement';
   row.innerHTML = `
     <div class="widget-row-line">
       <select class="w-type">
@@ -750,6 +790,10 @@ function addWidgetRow(widget) {
         <option value="url"${w.type === 'url' ? ' selected' : ''}>${esc(typeUrlLabel)}</option>
       </select>
       <input type="text" class="w-label" placeholder="${esc(t('widget_label_ph') || 'Libelle (optionnel)')}" value="${esc(w.label || '')}">
+      <label class="w-html-toggle" title="${esc(htmlTooltip)}">
+        <input type="checkbox" class="w-html"${w.allow_html ? ' checked' : ''}>
+        <span>${esc(htmlLabel)}</span>
+      </label>
       <button class="btn-remove" title="Supprimer">&times;</button>
     </div>
     <div class="widget-row-line">
@@ -780,18 +824,20 @@ function collectWidgetsFromUI() {
   const rows = document.querySelectorAll('#cfg-widgets-list .widget-row');
   const out = [];
   rows.forEach(r => {
-    const type    = r.querySelector('.w-type').value;
-    const label   = r.querySelector('.w-label').value.trim();
-    const content = r.querySelector('.w-content').value.trim();
-    const refresh = parseInt(r.querySelector('.w-refresh').value, 10) || 60;
+    const type      = r.querySelector('.w-type').value;
+    const label     = r.querySelector('.w-label').value.trim();
+    const content   = r.querySelector('.w-content').value.trim();
+    const refresh   = parseInt(r.querySelector('.w-refresh').value, 10) || 60;
+    const allowHtml = !!(r.querySelector('.w-html') && r.querySelector('.w-html').checked);
     if (type === 'text' && content) {
-      out.push({ type: 'text', label, content });
+      out.push({ type: 'text', label, content, allow_html: allowHtml });
     } else if (type === 'url' && /^https?:\/\//i.test(content)) {
       out.push({
         type: 'url',
         label,
         url: content,
         refresh_secondes: Math.max(10, Math.min(3600, refresh)),
+        allow_html: allowHtml,
       });
     }
   });
@@ -998,11 +1044,17 @@ ${invoke} '{"action":"reclamer","id":ID,"agent":"YOUR-AGENT-ID"}'
 Release a claim :
 ${invoke} '{"action":"liberer","id":ID}'
 
-List all tasks :
+List active tasks (excludes fait/annule by default, lighter responses) :
 ${invoke} '{"action":"lister"}'
 
-List by repo :
+List by repo (active only) :
 ${invoke} '{"action":"lister_par_repo","repo":"REPO_NAME"}'
+
+Include closed (fait) tasks too :
+${invoke} '{"action":"lister_par_repo","repo":"REPO_NAME","inclure_fait":true}'
+
+Only closed tasks (to read past summaries) :
+${invoke} '{"action":"lister_par_repo","repo":"REPO_NAME","statut":"fait"}'
 
 === AVAILABLE STATUSES ===
 en_cours | a_faire_rapidement | en_attente | bloque | fait | annule

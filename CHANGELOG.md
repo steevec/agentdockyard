@@ -7,6 +7,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 _(nothing yet)_
 
+## [1.5.0] - 2026-04-22
+
+### Added
+- **HTML mode for info widgets** — each widget has a new "HTML" checkbox in Settings. When enabled, the URL response (or text content) is rendered as raw HTML with full support for inline `<style>` and `<script>` blocks. jQuery 3.7.1 is bundled locally and always available as `$`/`jQuery` inside widgets, so you can turn a widget into a mini-dashboard with collapsible panels, clickable rows, or any custom interaction. Widget layout in HTML mode is unconstrained (no flex/nowrap wrapper), letting your HTML dictate its own shape.
+- **Larger widget payloads** — the per-widget fetch limit goes from 8 KiB to 256 KiB, making room for HTML + CSS + JS responses.
+- **Lighter listings for AI agents by default** — `lister`, `lister_par_agent` and `lister_par_repo` now exclude `fait` and `annule` tasks by default, drastically reducing payload size for AI agents that only need active work. Pass `"inclure_fait": true` / `"inclure_annule": true` to opt back in, or `"statut": "fait"` to retrieve only closed tasks (e.g. to re-read a past summary). The in-app guide and the generated AI prompt both document the new flags. The desktop UI is unaffected (it already asks for everything and filters locally).
+
+### Fixed
+- **HTML widget rendered blank** — a stray double `else` in `renderer.js` silently broke the widget refresh logic, so URL widgets with HTML mode showed only the beginning of the response (typically the inline `<style>` block) and never the actual content underneath. The whole payload is now rendered as expected.
+- **Agent CLI crashed on non-ASCII output** — on Windows, `agent.exe` (built with PyInstaller) defaulted to `cp1252` for stdout and threw `UnicodeEncodeError` as soon as a task note contained any character outside that codepage (e.g. `→`, emoji). This silently prevented the desktop UI from loading tasks. stdout/stderr are now wrapped in UTF-8 at startup, matching what the Electron main process already expects when reading the child pipe.
+- **DevTools no longer forced open** — the packaged build no longer calls `openDevTools()` at window ready. `F12` / `Ctrl+Shift+I` still toggle it manually.
+
 ## [1.4.0] - 2026-04-20
 
 ### Added

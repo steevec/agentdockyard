@@ -5,6 +5,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'">
   <title>AgentDockyard</title>
   <link rel="stylesheet" href="style.css">
+  <script src="assets/vendor/jquery.min.js"></script>
   <script src="i18n.js"></script>
 </head>
 <body>
@@ -367,15 +368,23 @@
               <tr><td>changer_statut</td>    <td>Changer le statut</td>                     <td>id, statut</td></tr>
               <tr><td>reclamer</td>          <td>Verrouiller pour un agent</td>             <td>id, agent</td></tr>
               <tr><td>liberer</td>           <td>Liberer la reclamation</td>                <td>id</td></tr>
-              <tr><td>lister</td>            <td>Lister toutes les taches</td>              <td>&mdash;</td></tr>
-              <tr><td>lister_par_agent</td>  <td>Filtrer par agent</td>                     <td>agent</td></tr>
-              <tr><td>lister_par_repo</td>   <td>Filtrer par repo</td>                      <td>repo</td></tr>
-              <tr><td>recuperer</td>         <td>Recuperer une tache par id</td>            <td>id</td></tr>
-              <tr><td>compter</td>           <td>Compter avec filtres optionnels</td>       <td>&mdash;</td></tr>
-              <tr><td>purger_maintenant</td> <td>Vider les taches fait/annule</td>          <td>&mdash;</td></tr>
-              <tr><td>exporter_json</td>     <td>Exporter toutes les taches</td>            <td>&mdash;</td></tr>
+              <tr><td>lister</td>            <td>Lister les taches actives (fait/annule exclus par defaut)</td>      <td>&mdash;</td></tr>
+              <tr><td>lister_par_agent</td>  <td>Filtrer par agent (fait/annule exclus par defaut)</td>               <td>agent</td></tr>
+              <tr><td>lister_par_repo</td>   <td>Filtrer par repo (fait/annule exclus par defaut)</td>                <td>repo</td></tr>
+              <tr><td>recuperer</td>         <td>Recuperer une tache par id</td>                                      <td>id</td></tr>
+              <tr><td>compter</td>           <td>Compter avec filtres optionnels</td>                                 <td>&mdash;</td></tr>
+              <tr><td>purger_maintenant</td> <td>Vider les taches fait/annule</td>                                    <td>&mdash;</td></tr>
+              <tr><td>exporter_json</td>     <td>Exporter toutes les taches</td>                                      <td>&mdash;</td></tr>
             </tbody>
           </table>
+          <div class="guide-sub" style="margin-top:10px">
+            <strong>Recuperer les taches cloturees</strong> (exclues par defaut pour alleger les listings IA) :
+            <ul style="margin-top:6px">
+              <li>Inclure les <code>fait</code> dans un listing : ajouter <code>"inclure_fait": true</code></li>
+              <li>Inclure les <code>annule</code> : ajouter <code>"inclure_annule": true</code></li>
+              <li>Extraire uniquement les cloturees : passer <code>"statut": "fait"</code> (override tous les filtres par defaut)</li>
+            </ul>
+          </div>
         </div>
 
       </div>

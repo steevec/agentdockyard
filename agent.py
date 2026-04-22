@@ -27,12 +27,21 @@ MIGRATION : si tasks.json existe et tasks.db est absent/vide, migration automati
 """
 
 import sys
+import io
 import json
 import os
 import sqlite3
 import tempfile
 import shutil
 from datetime import datetime, timedelta
+
+# Forcer UTF-8 sur stdout/stderr : sous Windows + PyInstaller, l encoding par defaut
+# est cp1252 et fait planter print() des que le JSON contient un caractere non-ASCII
+# (fleche -> dans une note, emoji, etc.). Le cote Electron lit stdout brut en UTF-8.
+if hasattr(sys.stdout, 'buffer'):
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace', line_buffering=True)
+if hasattr(sys.stderr, 'buffer'):
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace', line_buffering=True)
 
 # ─── Chemins ──────────────────────────────────────────────────────────────────
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -344,8 +353,42 @@ def _fetch_tasks(conn, where='', params=()):
     return [row_to_dict(r) for r in conn.execute(sql, params).fetchall()]
 
 
+def _build_statut_filter(data_in):
+    """Construit le filtre WHERE sur le statut.
+
+    Regles :
+    - Si 'statut' explicite : filtre strict sur ce statut (override tout).
+    - Sinon, par defaut : exclut 'fait' et 'annule' (listings plus legers pour les IA).
+    - 'inclure_fait: true'    : reinclut les taches 'fait'.
+    - 'inclure_annule: true'  : reinclut les taches 'annule'.
+    Retourne (where_fragment, params_tuple).
+    """
+    statut_explicite = (data_in.get('statut') or '').strip()
+    if statut_explicite:
+        return ("statut=?", (statut_explicite,))
+    exclus = []
+    if not data_in.get('inclure_fait'):   exclus.append('fait')
+    if not data_in.get('inclure_annule'): exclus.append('annule')
+    if not exclus:
+        return ('', ())
+    placeholders = ','.join(['?'] * len(exclus))
+    return (f"statut NOT IN ({placeholders})", tuple(exclus))
+
+
+def _combine_where(*clauses):
+    """Combine plusieurs (where, params) en un seul avec AND."""
+    wheres = []
+    params = []
+    for w, p in clauses:
+        if w:
+            wheres.append(w)
+            params.extend(p)
+    return (' AND '.join(wheres), tuple(params))
+
+
 def ws_lister(data_in, conn):
-    tasks = _fetch_tasks(conn)
+    where, params = _build_statut_filter(data_in)
+    tasks = _fetch_tasks(conn, where, params)
     tasks.sort(key=lambda t: (t.get('repo',''), t.get('agent',''), t.get('date_creation','')))
     return ok(f"{len(tasks)} tache(s)", {'taches': tasks})
 
@@ -353,7 +396,8 @@ def ws_lister(data_in, conn):
 def ws_lister_par_agent(data_in, conn):
     agent = (data_in.get('agent') or '').strip()
     if not agent: return nok("Champ 'agent' obligatoire")
-    tasks = _fetch_tasks(conn, 'agent=?', (agent,))
+    where, params = _combine_where(('agent=?', (agent,)), _build_statut_filter(data_in))
+    tasks = _fetch_tasks(conn, where, params)
     tasks.sort(key=lambda t: t.get('date_creation',''), reverse=True)
     return ok(f"{len(tasks)} tache(s) pour {agent}", {'taches': tasks})
 
@@ -361,7 +405,8 @@ def ws_lister_par_agent(data_in, conn):
 def ws_lister_par_repo(data_in, conn):
     repo = (data_in.get('repo') or '').strip()
     if not repo: return nok("Champ 'repo' obligatoire")
-    tasks = _fetch_tasks(conn, 'repo=?', (repo,))
+    where, params = _combine_where(('repo=?', (repo,)), _build_statut_filter(data_in))
+    tasks = _fetch_tasks(conn, where, params)
     tasks.sort(key=lambda t: t.get('date_creation',''), reverse=True)
     return ok(f"{len(tasks)} tache(s) pour repo '{repo}'", {'taches': tasks})
 
