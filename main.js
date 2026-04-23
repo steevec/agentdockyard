@@ -183,11 +183,23 @@ function callAgent(payload, dbPathOverride) {
     let stderr = '';
     let done   = false;
 
+    // spawn() AVANT setTimeout : si spawn jette une exception synchrone
+    // (binaire bloque par antivirus, introuvable, etc.) on doit sortir tout
+    // de suite. Un setTimeout qui referencerait un child jamais initialise
+    // crashe le main process en TDZ (ReferenceError: Cannot access 'child'
+    // before initialization) des que le timer fire.
+    let child;
+    try {
+      child = spawn(bin, args);
+    } catch (err) {
+      console.error('[callAgent] spawn a lance une exception :', err && err.message);
+      return resolve({ statut: 'NOK', message: 'Spawn impossible : ' + (err && err.message || 'erreur inconnue') });
+    }
+
     const timer = setTimeout(() => {
-      if (!done) { done = true; child.kill(); resolve({ statut: 'NOK', message: 'Timeout' }); }
+      if (!done) { done = true; try { child.kill(); } catch (_) {} resolve({ statut: 'NOK', message: 'Timeout' }); }
     }, 10000);
 
-    const child = spawn(bin, args);
     child.stdout.on('data', d => { stdout += d; });
     child.stderr.on('data', d => { stderr += d; });
     child.on('close', (code) => {

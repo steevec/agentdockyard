@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 _(nothing yet)_
 
+## [1.5.1] - 2026-04-23
+
+### Fixed
+- **Main process crashed with `ReferenceError: Cannot access 'child' before initialization`** — in `callAgent`, `setTimeout` was scheduled *before* `const child = spawn(...)`. When `spawn()` threw synchronously (typically when Windows Defender or another antivirus blocked the unsigned `agent.exe`), the child variable was never initialized, but the already-scheduled timer fired 10 s later and hit it in the temporal dead zone, taking down the whole Electron main process with a fatal JavaScript error dialog. `spawn()` now runs first, inside a `try/catch` that resolves the promise cleanly with a `NOK` status, and the timer's `child.kill()` call is also guarded. The app stays usable and surfaces a normal error instead of crashing, even when the agent binary is unavailable.
+
 ## [1.5.0] - 2026-04-22
 
 ### Added
