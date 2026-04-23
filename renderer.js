@@ -192,6 +192,9 @@ async function refreshTasks() {
   // Pendant une preview de snapshot, on gele l'affichage live pour ne pas perturber
   // les IDs DOM partages (le preview utilise le meme generateur de cartes).
   if (previewFilename) { resetRefreshTimer(); return; }
+  // Tant qu'un panneau lateral est ouvert (parametres, guide, snapshots), on gele
+  // le refresh pour eviter tout effet de bord sur l'interaction utilisateur.
+  if (isSidePanelOpen()) { resetRefreshTimer(); return; }
   showDot(true);
   try {
     const r = await window.taskAPI.getTasks();
@@ -208,6 +211,10 @@ function resetRefreshTimer() {
   const secs = (currentConfig && currentConfig.interface && currentConfig.interface.refresh_secondes) || 30;
   clearTimeout(refreshTimer);
   refreshTimer = setTimeout(refreshTasks, Math.max(5, secs) * 1000);
+}
+
+function isSidePanelOpen() {
+  return !!document.querySelector('.side-panel-overlay.visible');
 }
 
 function showDot(active) {
