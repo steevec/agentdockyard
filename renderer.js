@@ -383,21 +383,27 @@ function renderRepoGroup(repo, agentsMap, opts) {
   const b64  = btoa(unescape(encodeURIComponent(repo)));
   const coll = collapsedRepos.has(repo);
 
-  let total = 0, faites = [];
+  let total = 0, todo = 0, faites = [];
   const agentsActifs = {};
   for (const ag of Object.keys(agentsMap).sort()) {
     for (const t of agentsMap[ag]) {
       total++;
-      if (t.statut === 'fait') faites.push(t);
-      else { if (!agentsActifs[ag]) agentsActifs[ag] = []; agentsActifs[ag].push(t); }
+      if (t.statut === 'fait') {
+        faites.push(t);
+      } else {
+        if (t.statut !== 'annule') todo++;
+        if (!agentsActifs[ag]) agentsActifs[ag] = [];
+        agentsActifs[ag].push(t);
+      }
     }
   }
+  const todoLabel = todo > 1 ? t('repo_todo_many') : t('repo_todo_one');
 
   let h = `<div class="groupe-repo${coll ? ' collapsed' : ''}" id="repo-${b64}">`;
   h += `<div class="groupe-repo-titre" onclick='toggleRepo(${j(repo)},${j(b64)})'>`;
   h += `<span class="repo-fleche">\u25BE</span>`;
   h += `<span class="repo-icone">${repo === 'Cowork' ? '\u2699\uFE0F' : '\u{1F4C1}'}</span>`;
-  h += `<span class="repo-nom">${esc(nom)}</span>`;
+  h += `<span class="repo-nom">${esc(nom)} <span class="repo-todo">(${todo} ${esc(todoLabel)})</span></span>`;
   h += `<span class="repo-compteur">${total}</span>`;
   h += `</div>`;
   h += `<div class="groupe-repo-contenu">`;

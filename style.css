@@ -179,6 +179,7 @@ html, body { background: var(--bg); color: var(--text); font-family: var(--font)
 .groupe-repo.collapsed .repo-fleche { transform: rotate(-90deg); }
 .repo-icone { font-size: 15px; }
 .repo-nom { font-weight: 600; font-size: 13px; flex: 1; color: var(--text); }
+.repo-todo { color: var(--text-dim); font-weight: 500; }
 .repo-compteur {
   background: var(--border); color: var(--text-dim);
   font-size: 11px; font-weight: 600;
