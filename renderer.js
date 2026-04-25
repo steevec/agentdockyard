@@ -1003,14 +1003,136 @@ function bindGuidePanel() {
 
 async function openGuidePanel() {
   const agentPath = await window.taskAPI.getAgentPath();
+  const config    = await window.taskAPI.getConfig();
   const quote     = `"${agentPath}"`;
+  const httpCfg   = (config && config.httpApi) || {};
+  const httpHost  = httpCfg.host || '127.0.0.1';
+  const httpPort  = httpCfg.port || 17891;
+  const localHost = httpHost === '0.0.0.0' ? '127.0.0.1' : httpHost;
+  const baseUrl   = `http://${localHost}:${httpPort}`;
+  const remoteUrl = `http://IP_DU_PC_WINDOWS:${httpPort}`;
 
   document.getElementById('guide-agent-path').textContent = agentPath;
+
+  const httpExamples = document.getElementById('guide-http-examples');
+  if (httpExamples) httpExamples.textContent = buildHttpExamples(baseUrl, remoteUrl, httpHost, httpPort);
+
+  const httpPrompt = document.getElementById('guide-http-prompt');
+  if (httpPrompt) httpPrompt.textContent = buildHttpPrompt(remoteUrl);
 
   const unified = document.getElementById('guide-unified');
   if (unified) unified.textContent = buildUnifiedPrompt(quote);
 
   openSidePanel('guide-overlay');
+}
+
+function buildHttpExamples(baseUrl, remoteUrl, configuredHost, port) {
+  return (
+`# API HTTP locale AgentDockyard
+# Config actuelle : host=${configuredHost}, port=${port}
+# Fichier de config Windows :
+# %APPDATA%\\AgentDockyard\\config.json
+#
+# Pour un agent sur le meme PC :
+#   host=127.0.0.1 suffit.
+#
+# Pour Claude Cowork, une sandbox Linux ou une machine du reseau :
+#   mettre host=0.0.0.0, redemarrer AgentDockyard, puis autoriser TCP ${port}
+#   dans le pare-feu Windows si la connexion est refusee.
+#
+# Token :
+#   si httpApi.token est vide, aucun header n'est requis.
+#   si httpApi.token est rempli, ajouter :
+#   -H "X-AgentDockyard-Token: VOTRE_TOKEN"
+
+# Config minimale pour acces reseau local
+{
+  "httpApi": {
+    "enabled": true,
+    "host": "0.0.0.0",
+    "port": ${port},
+    "token": ""
+  }
+}
+
+# PowerShell local
+Invoke-RestMethod -Method Get -Uri "${baseUrl}/health"
+
+Invoke-RestMethod -Method Post \`
+  -Uri "${baseUrl}/api/agentdockyard" \`
+  -ContentType "application/json" \`
+  -Body '{"action":"ajouter","agent":"claude-cowork","repo":"AgentDockyard","sujet":"Test HTTP local","statut":"en_cours","note":"Cree via API HTTP locale"}'
+
+# Sandbox ou autre machine du reseau local
+curl ${remoteUrl}/health
+
+curl -X POST ${remoteUrl}/api/agentdockyard \\
+  -H "Content-Type: application/json" \\
+  -d '{"action":"ajouter","agent":"claude-cowork","repo":"AgentDockyard","sujet":"Test HTTP depuis sandbox","statut":"en_cours","note":"Cree sans acces dossier"}'`
+  );
+}
+
+function buildHttpPrompt(remoteUrl) {
+  return (
+`## AgentDockyard - HTTP task management
+
+You can use AgentDockyard through its local HTTP API.
+Base URL: ${remoteUrl}
+
+Use HTTP only:
+- Do not ask for Windows folder access.
+- Do not call agent.exe directly.
+- Do not write to tasks.db directly.
+- If the API is unreachable, continue the main work and mention the failure.
+- Use short timeouts when you run curl from automation.
+
+Health check:
+curl ${remoteUrl}/health
+
+Main endpoint:
+POST ${remoteUrl}/api/agentdockyard
+Content-Type: application/json
+
+The JSON body is the same payload used by agent.exe.
+
+Mandatory workflow:
+1. Create a task as soon as the work starts.
+2. Keep the task note updated during meaningful steps.
+3. Use changer_statut with bloque or en_attente when needed.
+4. Close the task with a useful summary when the work is done.
+5. If you detect a separate issue, create a new task for it.
+
+Create:
+curl -X POST ${remoteUrl}/api/agentdockyard \\
+  -H "Content-Type: application/json" \\
+  -d '{"action":"ajouter","agent":"YOUR-AGENT-ID","repo":"REPO_NAME","sujet":"Short description","statut":"en_cours","note":"OBJECTIF : ...\\n\\nPLAN D ACTION :\\n1. ...\\n2. ...\\n\\nETAT D AVANCEMENT :\\n- [ ] Demarrage"}'
+
+Update:
+curl -X POST ${remoteUrl}/api/agentdockyard \\
+  -H "Content-Type: application/json" \\
+  -d '{"action":"modifier","id":ID,"note":"Progress: step X done, Y remaining"}'
+
+Close:
+curl -X POST ${remoteUrl}/api/agentdockyard \\
+  -H "Content-Type: application/json" \\
+  -d '{"action":"cloturer","id":ID,"note":"Full summary of what was done"}'
+
+Block:
+curl -X POST ${remoteUrl}/api/agentdockyard \\
+  -H "Content-Type: application/json" \\
+  -d '{"action":"changer_statut","id":ID,"statut":"bloque","note":"Precise reason for blocker"}'
+
+Create a follow-up task:
+curl -X POST ${remoteUrl}/api/agentdockyard \\
+  -H "Content-Type: application/json" \\
+  -d '{"action":"ajouter","agent":"YOUR-AGENT-ID","repo":"REPO_NAME","sujet":"Verifier/corriger : short issue","statut":"a_faire_rapidement","note":"PROBLEME DETECTE : ...\\n\\nCONTEXTE : ...\\n\\nACTION ATTENDUE : ..."}'
+
+Available actions:
+ajouter | modifier | cloturer | annuler | changer_statut | reclamer | liberer | lister | lister_par_agent | lister_par_repo | recuperer | compter
+
+Available statuses:
+en_cours | a_faire_rapidement | en_attente | bloque | fait | annule`
+  );
 }
 
 function buildUnifiedPrompt(quotedPath) {
@@ -1022,6 +1144,9 @@ function buildUnifiedPrompt(quotedPath) {
 
 You have access to AgentDockyard to declare and track your tasks in real time.
 Script : ${invoke}
+
+Use this CLI prompt when agent.exe or agent.py is directly accessible.
+For Claude Cowork, sandboxes, remote machines, or scheduled jobs without local file access, use the HTTP prompt in the AgentDockyard guide instead.
 
 === MANDATORY RULES ===
 1. ALWAYS declare your tasks as soon as you start.

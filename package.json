@@ -37,6 +37,7 @@
     },
     "files": [
       "main.js",
+      "http-api.js",
       "preload.js",
       "renderer.js",
       "i18n.js",

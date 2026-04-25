@@ -200,6 +200,89 @@ The full command reference lives in the app guide and in [`agent.py`](agent.py).
 
 ---
 
+## Local HTTP API
+
+AgentDockyard can also expose a minimal local HTTP API. It is useful for Claude Cowork, Linux sandboxes, another machine on the LAN, or scheduled jobs that cannot call `agent.exe` directly.
+
+The HTTP API is only a bridge to the existing local agent. It does not add a cloud backend and it does not change the SQLite task format.
+
+Default config:
+
+```json
+{
+  "httpApi": {
+    "enabled": true,
+    "host": "127.0.0.1",
+    "port": 17891,
+    "token": ""
+  }
+}
+```
+
+Config file:
+
+```text
+%APPDATA%\AgentDockyard\config.json
+```
+
+Use `127.0.0.1` when the caller runs on the same Windows machine. Use `0.0.0.0` when Claude Cowork, a sandbox, or another LAN machine must reach the API through the Windows PC IP address. Restart AgentDockyard after changing this config.
+
+If `token` is empty, no token is required. If it is set, callers must send:
+
+```text
+X-AgentDockyard-Token: YOUR_TOKEN
+```
+
+Health check:
+
+```powershell
+Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:17891/health"
+```
+
+Create a task through HTTP:
+
+```powershell
+Invoke-RestMethod -Method Post `
+  -Uri "http://127.0.0.1:17891/api/agentdockyard" `
+  -ContentType "application/json" `
+  -Body '{"action":"ajouter","agent":"claude-cowork","repo":"AgentDockyard","sujet":"Test HTTP local","statut":"en_cours","note":"Created through local HTTP API"}'
+```
+
+From a sandbox or another LAN machine:
+
+```bash
+curl http://IP_DU_PC_WINDOWS:17891/health
+
+curl -X POST http://IP_DU_PC_WINDOWS:17891/api/agentdockyard \
+  -H "Content-Type: application/json" \
+  -d '{"action":"ajouter","agent":"claude-cowork","repo":"AgentDockyard","sujet":"Test HTTP from sandbox","statut":"en_cours","note":"Created without folder access"}'
+```
+
+Recommended prompt for HTTP-only agents:
+
+```text
+You can use AgentDockyard through its local HTTP API.
+Base URL: http://IP_DU_PC_WINDOWS:17891
+
+Use HTTP only:
+- Do not ask for Windows folder access.
+- Do not call agent.exe directly.
+- Do not write to tasks.db directly.
+- If the API is unreachable, continue the main work and mention the failure.
+- Use short timeouts when you run curl from automation.
+
+Mandatory workflow:
+1. Create a task as soon as the work starts.
+2. Keep the task note updated during meaningful steps.
+3. Use changer_statut with bloque or en_attente when needed.
+4. Close the task with a useful summary when the work is done.
+5. If you detect a separate issue, create a new task for it.
+```
+
+Automation jobs should treat AgentDockyard as best-effort telemetry. If the API is unavailable, log the error and continue the main business process unless task tracking is the only purpose of that job.
+
+---
+
 ## Statuses
 
 | Value | Meaning |
@@ -246,8 +329,9 @@ Network access is only relevant for optional update checks against GitHub Releas
 ```
 
 - **Electron renderer**: dashboard UI
-- **Electron main**: window lifecycle, config JSON, multi-screen placement, auto-updater, DB watching
+- **Electron main**: window lifecycle, config JSON, multi-screen placement, auto-updater, DB watching, optional local HTTP API
 - **`agent.exe`**: standalone CLI used by agents to read and write tasks
+- **HTTP API**: optional local bridge that forwards JSON payloads to the same agent mechanism
 - **`tasks.db`**: local SQLite task store
 
 ---

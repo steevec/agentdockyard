@@ -16,6 +16,7 @@ const http            = require('http');
 const https           = require('https');
 const { URL }         = require('url');
 const { spawnSync, spawn } = require('child_process');
+const { startHttpApi } = require('./http-api');
 
 // electron-updater : lazy-load pour ne pas crasher en dev (il appelle app.getVersion() au require)
 let _autoUpdater = null;
@@ -93,6 +94,12 @@ const CONFIG_DEFAULT = {
     afficher_annule: false,
     max_par_groupe: 0,
   },
+  httpApi: {
+    enabled: true,
+    host: '127.0.0.1',
+    port: 17891,
+    token: '',
+  },
   agents: [
     { id: 'claude-cowork', label: 'claude-cowork', emoji: '\u2699\uFE0F' },
     { id: 'claude-code',   label: 'claude-code',   emoji: '\u{1F916}'    },
@@ -155,6 +162,7 @@ function saveConfig(partial) {
 
 // ─── Detection Python (dev uniquement) ────────────────────────────────────────
 let PYTHON_CMD = null;
+let httpApiServer = null;
 function detectPython() {
   for (const cmd of ['python', 'python3', 'py']) {
     try {
@@ -552,6 +560,15 @@ app.whenReady().then(() => {
     if (cfg.purge && cfg.purge.au_demarrage && cfg.purge.enabled) {
       callAgent({ action: 'purger_maintenant' });
     }
+    httpApiServer = startHttpApi({
+      config: cfg,
+      version: app.getVersion(),
+      isPackaged: IS_PACKAGED,
+      agentExePath: AGENT_EXE_PATH,
+      agentScriptDev: AGENT_SCRIPT_DEV,
+      dbPath: DB_PATH,
+      getPythonCmd: () => PYTHON_CMD,
+    });
   } catch (e) { /* ignore */ }
 
   createWindow();
@@ -572,6 +589,10 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   stopSnapshotScheduler();
+  if (httpApiServer) {
+    try { httpApiServer.close(); } catch (_) { /* ignore */ }
+    httpApiServer = null;
+  }
   if (process.platform !== 'darwin') app.quit();
 });
 
