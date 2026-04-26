@@ -78,6 +78,10 @@ let openNotes        = new Set();
 let openDropdowns    = new Set();
 let editingTaskId    = null;
 let refreshTimer     = null;
+let refreshInFlight  = false;
+let dbRefreshTimer   = null;
+let lastRenderKey    = '';
+let pendingAutoRefresh = false;
 let addBarOpen       = false;
 let previewFilename  = null;  // snapshot en cours d'apercu (null = pas en mode preview)
 
@@ -111,7 +115,7 @@ async function init() {
   resetRefreshTimer();
   applyWidgetsFromConfig();
 
-  window.taskAPI.onDbChanged(() => { showDot(true); refreshTasks(); });
+  window.taskAPI.onDbChanged(scheduleDbRefresh);
 
   // Bannière de mise à jour
   if (window.taskAPI.onUpdateAvailable) {
@@ -132,7 +136,7 @@ async function init() {
   });
 
   document.addEventListener('keydown', e => {
-    if (e.key === 'F5')     { e.preventDefault(); refreshTasks(); }
+    if (e.key === 'F5')     { e.preventDefault(); refreshTasks({ force: true }); }
     if (e.key === 'Escape') {
       closeModal();
       closeAllDropdowns();
@@ -180,7 +184,7 @@ async function toggleTheme() {
 // ─── Header buttons ───────────────────────────────────────────────────────────
 function bindHeaderButtons() {
   document.getElementById('btn-theme').addEventListener('click',      toggleTheme);
-  document.getElementById('btn-refresh').addEventListener('click',    refreshTasks);
+  document.getElementById('btn-refresh').addEventListener('click',    () => refreshTasks({ force: true }));
   document.getElementById('btn-add-toggle').addEventListener('click', toggleAddBar);
   document.getElementById('btn-settings').addEventListener('click',   openSettingsPanel);
   document.getElementById('btn-guide').addEventListener('click',      openGuidePanel);
@@ -188,23 +192,28 @@ function bindHeaderButtons() {
 }
 
 // ─── Refresh & rendu ──────────────────────────────────────────────────────────
-async function refreshTasks() {
-  // Pendant une preview de snapshot, on gele l'affichage live pour ne pas perturber
-  // les IDs DOM partages (le preview utilise le meme generateur de cartes).
-  if (previewFilename) { resetRefreshTimer(); return; }
-  // Tant qu'un panneau lateral est ouvert (parametres, guide, snapshots), on gele
-  // le refresh pour eviter tout effet de bord sur l'interaction utilisateur.
-  if (isSidePanelOpen()) { resetRefreshTimer(); return; }
+async function refreshTasks(opts = {}) {
+  const force = !!opts.force;
+  // Pendant une interaction utilisateur, on gele l'affichage live pour ne pas
+  // remplacer le DOM sous la souris ou dans un panneau/modal ouvert.
+  if (!force && isRefreshBlockedByInteraction()) {
+    pendingAutoRefresh = true;
+    showDot(false);
+    resetRefreshTimer();
+    return;
+  }
+  if (refreshInFlight) { resetRefreshTimer(); return; }
+  refreshInFlight = true;
   showDot(true);
   try {
     const r = await window.taskAPI.getTasks();
     if (r && r.error) { showToast('Erreur DB : ' + r.error, 'error'); return; }
     currentTasks = r || [];
-    renderTasks(currentTasks);
+    renderTasks(currentTasks, { force });
     const nb = currentTasks.filter(tk => tk.statut !== 'fait').length;
     document.getElementById('task-count').textContent = nb ? `${nb} ${nb > 1 ? t('tasks_active_many') : t('tasks_active_one')}` : '';
   } catch(err) { showToast('Erreur : ' + err.message, 'error'); }
-  finally { showDot(false); resetRefreshTimer(); }
+  finally { refreshInFlight = false; showDot(false); resetRefreshTimer(); }
 }
 
 function resetRefreshTimer() {
@@ -217,6 +226,33 @@ function isSidePanelOpen() {
   return !!document.querySelector('.side-panel-overlay.visible');
 }
 
+function isModalOpen() {
+  return !!document.querySelector('#modal-overlay.visible');
+}
+
+function isRefreshBlockedByInteraction() {
+  return !!previewFilename || isSidePanelOpen() || isModalOpen() || addBarOpen || openDropdowns.size > 0;
+}
+
+function scheduleDbRefresh() {
+  clearTimeout(dbRefreshTimer);
+  dbRefreshTimer = setTimeout(() => {
+    if (isRefreshBlockedByInteraction()) {
+      pendingAutoRefresh = true;
+      showDot(false);
+      resetRefreshTimer();
+      return;
+    }
+    refreshTasks();
+  }, 250);
+}
+
+function flushPendingRefresh() {
+  if (!pendingAutoRefresh || isRefreshBlockedByInteraction()) return;
+  pendingAutoRefresh = false;
+  refreshTasks();
+}
+
 function showDot(active) {
   document.getElementById('refresh-dot').classList.toggle('active', active);
 }
@@ -225,6 +261,7 @@ function toggleAddBar() {
   addBarOpen = !addBarOpen;
   document.getElementById('add-bar').classList.toggle('open', addBarOpen);
   if (addBarOpen) setTimeout(() => document.getElementById('f-sujet').focus(), 320);
+  else flushPendingRefresh();
 }
 
 function buildTasksHtml(tasks, opts) {
@@ -260,14 +297,24 @@ function buildTasksHtml(tasks, opts) {
   return repoKeys.map(r => renderRepoGroup(r, groupes[r], { showFait: opts.showFait, maxPerGrp: opts.maxPerGrp })).join('');
 }
 
-function renderTasks(tasks) {
+function renderTasks(tasks, opts = {}) {
   const container = document.getElementById('tasks-container');
   const cfgIf = (currentConfig && currentConfig.interface) || {};
   const showFait   = cfgIf.afficher_fait   !== false;
   const showAnnule = cfgIf.afficher_annule === true;
   const maxPerGrp  = Math.max(0, cfgIf.max_par_groupe || 0);
+  const renderKey  = JSON.stringify({
+    lang: currentLang,
+    showFait,
+    showAnnule,
+    maxPerGrp,
+    tasks,
+  });
+
+  if (!opts.force && renderKey === lastRenderKey) return;
 
   container.innerHTML = buildTasksHtml(tasks, { showFait, showAnnule, maxPerGrp });
+  lastRenderKey = renderKey;
 
   const visibleTasks = tasks.filter(tk => tk.statut !== 'annule' || showAnnule);
   const closedIds    = new Set(visibleTasks.filter(tk => tk.statut === 'fait' || tk.statut === 'annule').map(tk => tk.id));
@@ -617,6 +664,7 @@ function openEditModal(id) {
 function closeModal() {
   document.getElementById('modal-overlay').classList.remove('visible');
   editingTaskId = null;
+  flushPendingRefresh();
 }
 
 async function saveModal() {
@@ -651,6 +699,7 @@ function openSidePanel(overlayId) {
 function closeSidePanel(overlayId) {
   const el = document.getElementById(overlayId);
   if (el) el.classList.remove('visible');
+  flushPendingRefresh();
 }
 
 // ─── Panneau Parametres ───────────────────────────────────────────────────────
