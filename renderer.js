@@ -283,14 +283,23 @@ function buildTasksHtml(tasks, opts) {
     groupes[repo][agent].push(tk);
   }
 
-  function repoActif(repo) {
-    return Object.values(groupes[repo]).flat().some(tk => tk.statut !== 'fait' && tk.statut !== 'annule');
+  const repoMaxDate = {};
+  for (const repo of Object.keys(groupes)) {
+    let max = '';
+    for (const tk of Object.values(groupes[repo]).flat()) {
+      if (tk.statut === 'fait' || tk.statut === 'annule') continue;
+      const d = tk.date_creation || '';
+      if (d > max) max = d;
+    }
+    repoMaxDate[repo] = max;
   }
   const repoKeys = Object.keys(groupes).sort((a, b) => {
     if (a === '_hors_repo_') return 1;
     if (b === '_hors_repo_') return -1;
-    const aA = repoActif(a), bA = repoActif(b);
+    const aMax = repoMaxDate[a], bMax = repoMaxDate[b];
+    const aA = !!aMax, bA = !!bMax;
     if (aA !== bA) return aA ? -1 : 1;
+    if (aMax !== bMax) return bMax.localeCompare(aMax);
     return a.localeCompare(b);
   });
 
