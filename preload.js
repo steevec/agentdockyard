@@ -36,7 +36,7 @@ contextBridge.exposeInMainWorld('taskAPI', {
   checkUpdates: ()           => ipcRenderer.invoke('check-for-updates'),
 
   // ─── Widgets (fetch URL externes cote main process) ────────────────────────
-  fetchWidgetUrl: (url)      => ipcRenderer.invoke('fetch-widget-url', url),
+  fetchWidgetUrl: (url, timeoutSeconds) => ipcRenderer.invoke('fetch-widget-url', url, timeoutSeconds),
 
   // ─── Multi-ecrans & fenetre ─────────────────────────────────────────────────
   getDisplays:       ()       => ipcRenderer.invoke('get-displays'),

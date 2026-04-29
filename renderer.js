@@ -359,7 +359,7 @@ async function fetchWidget(idx) {
   const w = widgetsConfig[idx];
   if (!w || w.type !== 'url' || !w.url) return;
   try {
-    const r = await window.taskAPI.fetchWidgetUrl(w.url);
+    const r = await window.taskAPI.fetchWidgetUrl(w.url, w.timeout_secondes);
     if (r && r.ok) {
       const raw = r.value || '';
       widgetValues.set(idx, w.allow_html ? raw : raw.slice(0, 300));
@@ -862,12 +862,16 @@ function addWidgetRow(widget) {
       <input type="text" class="w-content" value="${esc(w.type === 'url' ? (w.url || '') : (w.content || ''))}">
       <input type="number" class="w-refresh" min="10" max="3600" value="${w.refresh_secondes || 60}" title="${esc(t('widget_refresh_tooltip') || 'Delai (sec) entre chaque requete URL')}">
       <span class="w-refresh-suffix">s</span>
+      <input type="number" class="w-timeout" min="2" max="60" value="${w.timeout_secondes || 15}" title="${esc(t('widget_timeout_tooltip') || 'Timeout (sec) de la requete URL')}">
+      <span class="w-timeout-suffix">s timeout</span>
     </div>
   `;
   const selType    = row.querySelector('.w-type');
   const inpContent = row.querySelector('.w-content');
   const inpRefresh = row.querySelector('.w-refresh');
   const suffix     = row.querySelector('.w-refresh-suffix');
+  const inpTimeout = row.querySelector('.w-timeout');
+  const tSuffix    = row.querySelector('.w-timeout-suffix');
   const updateMode = () => {
     const isUrl = selType.value === 'url';
     inpContent.placeholder = isUrl
@@ -875,6 +879,8 @@ function addWidgetRow(widget) {
       : (t('widget_text_ph') || 'Texte a afficher...');
     inpRefresh.style.display = isUrl ? '' : 'none';
     suffix.style.display     = isUrl ? '' : 'none';
+    inpTimeout.style.display = isUrl ? '' : 'none';
+    tSuffix.style.display    = isUrl ? '' : 'none';
   };
   selType.addEventListener('change', updateMode);
   updateMode();
@@ -890,6 +896,7 @@ function collectWidgetsFromUI() {
     const label     = r.querySelector('.w-label').value.trim();
     const content   = r.querySelector('.w-content').value.trim();
     const refresh   = parseInt(r.querySelector('.w-refresh').value, 10) || 60;
+    const timeout   = parseInt(r.querySelector('.w-timeout').value, 10) || 15;
     const allowHtml = !!(r.querySelector('.w-html') && r.querySelector('.w-html').checked);
     if (type === 'text' && content) {
       out.push({ type: 'text', label, content, allow_html: allowHtml });
@@ -899,6 +906,7 @@ function collectWidgetsFromUI() {
         label,
         url: content,
         refresh_secondes: Math.max(10, Math.min(3600, refresh)),
+        timeout_secondes: Math.max(2, Math.min(60, timeout)),
         allow_html: allowHtml,
       });
     }

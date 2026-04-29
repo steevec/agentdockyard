@@ -709,7 +709,7 @@ ipcMain.handle('open-external', (event, url) => {
 // ─── IPC : widgets (fetch URL cote main pour contourner CSP renderer) ─────────
 // Renvoie { ok, value, error }. Le body est limite a 8 Ko et trim pour eviter
 // qu une reponse volumineuse accidentelle ne pollue l UI.
-ipcMain.handle('fetch-widget-url', async (event, url) => {
+ipcMain.handle('fetch-widget-url', async (event, url, timeoutSeconds) => {
   if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) {
     return { ok: false, error: 'URL invalide (http(s) requis)' };
   }
@@ -717,7 +717,8 @@ ipcMain.handle('fetch-widget-url', async (event, url) => {
   try { parsed = new URL(url); } catch (e) { return { ok: false, error: 'URL malformee' }; }
   const lib = parsed.protocol === 'https:' ? https : http;
   const MAX_BYTES    = 256 * 1024;
-  const TIMEOUT_MS   = 5000;
+  const t = parseInt(timeoutSeconds, 10);
+  const TIMEOUT_MS   = (Number.isFinite(t) && t > 0) ? Math.max(2, Math.min(60, t)) * 1000 : 15000;
 
   return new Promise((resolve) => {
     let done = false;
