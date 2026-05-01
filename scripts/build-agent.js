@@ -76,6 +76,8 @@ function main() {
   const r = spawnSync(python, [
     '-m', 'PyInstaller',
     '--onefile',
+    '--clean',                  // ignore les caches PyInstaller (build reproductible)
+    '--noupx',                  // pas de compression UPX (souvent flaggee par les antivirus)
     '--name', 'agent',
     '--console',                // mode console (cli)
     '--distpath',   DIST_AGENT,
