@@ -265,8 +265,8 @@ function toggleAddBar() {
 }
 
 function buildTasksHtml(tasks, opts) {
-  const visibleTasks = tasks.filter(t => {
-    if (t.statut === 'annule' && !opts.showAnnule) return false;
+  const visibleTasks = tasks.filter(tk => {
+    if (tk.statut === 'annule' && !opts.showAnnule) return false;
     return true;
   });
 
@@ -409,7 +409,6 @@ function renderWidgets() {
       val.className = 'widget-value-html';
       val.innerHTML = value;
       executeScriptsIn(val);
-      console.log('[widget]', idx, 'HTML rendered, length=', (value || '').length, 'first=', (value || '').slice(0, 80));
       line.appendChild(val);
     } else {
       const val = document.createElement('span');
@@ -442,14 +441,14 @@ function renderRepoGroup(repo, agentsMap, opts) {
   let total = 0, todo = 0, faites = [];
   const agentsActifs = {};
   for (const ag of Object.keys(agentsMap).sort()) {
-    for (const t of agentsMap[ag]) {
+    for (const tk of agentsMap[ag]) {
       total++;
-      if (t.statut === 'fait') {
-        faites.push(t);
+      if (tk.statut === 'fait') {
+        faites.push(tk);
       } else {
-        if (t.statut !== 'annule') todo++;
+        if (tk.statut !== 'annule') todo++;
         if (!agentsActifs[ag]) agentsActifs[ag] = [];
-        agentsActifs[ag].push(t);
+        agentsActifs[ag].push(tk);
       }
     }
   }
@@ -619,7 +618,7 @@ async function submitAddForm(e) {
   };
   if (!data.sujet) { showToast(t('form_sujet_required') || 'Sujet obligatoire', 'error'); return; }
   const r = await window.taskAPI.addTask(data);
-  if (r.error) { showToast('Erreur : ' + r.error, 'error'); return; }
+  if (!r || !r.id) { showToast(t('toast_add_error') || 'Erreur creation tache', 'error'); return; }
   showToast(t('toast_task_created').replace('ID', r.id), 'success');
   form.sujet.value = ''; form.contexte.value = ''; form.note.value = '';
   if (addBarOpen) toggleAddBar();
@@ -634,7 +633,8 @@ async function doCloseTask(id) {
 }
 
 async function doDeleteTask(id) {
-  if (!confirm(`Delete task #${id}?`)) return;
+  const msg = (t('confirm_delete') || 'Delete task #ID?').replace('ID', id);
+  if (!confirm(msg)) return;
   await window.taskAPI.deleteTask(id);
   showToast(t('toast_task_deleted').replace('ID', id), 'success');
   await refreshTasks();
@@ -1378,7 +1378,6 @@ function closePreview() {
 
 async function confirmRestore() {
   if (!previewFilename) return;
-  const d = new Date();  // juste pour le message
   const msg = t('preview_restore_confirm');
   if (!confirm(msg)) return;
   const r = await window.taskAPI.restoreSnapshot(previewFilename);

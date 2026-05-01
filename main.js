@@ -372,6 +372,9 @@ function restoreSnapshotFile(filename) {
   if (!meta) return { ok: false, error: 'Nom de snapshot invalide' };
   const src = path.join(SNAPSHOTS_DIR, filename);
   if (!fs.existsSync(src)) return { ok: false, error: 'Snapshot introuvable' };
+  let srcSize = 0;
+  try { srcSize = fs.statSync(src).size; } catch (_) { /* ignore */ }
+  if (!srcSize) return { ok: false, error: 'Snapshot vide ou illisible' };
   // Securite : snapshot de l'etat courant AVANT d'ecraser
   const backupName = takeSnapshot('before-restore');
   try {
@@ -397,7 +400,7 @@ function applyWindowConfig(win, cfg) {
   let display = displays[0];
   if (typeof winCfg.displayIndex === 'number' && displays[winCfg.displayIndex]) {
     display = displays[winCfg.displayIndex];
-  } else if (winCfg.displayId !== null && winCfg.displayId !== undefined) {
+  } else if (winCfg.displayId != null) {
     const found = displays.find(d => d.id === winCfg.displayId);
     if (found) display = found;
   }

@@ -148,7 +148,13 @@ function startHttpApi(options) {
   const port = Number(cfg.port) || 17891;
 
   const server = http.createServer(async (req, res) => {
-    const url = new URL(req.url, `http://${req.headers.host || `${host}:${port}`}`);
+    let url;
+    try {
+      url = new URL(req.url, `http://${req.headers.host || `${host}:${port}`}`);
+    } catch (_) {
+      jsonResponse(res, 400, { ok: false, error: 'Bad request URL' });
+      return;
+    }
 
     if (req.method === 'GET' && url.pathname === '/health') {
       jsonResponse(res, 200, {
