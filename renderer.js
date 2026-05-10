@@ -43,6 +43,10 @@ function applyI18n() {
   if (btnGuide) btnGuide.title = t('btn_guide_title');
   const btnRefresh = document.getElementById('btn-refresh');
   if (btnRefresh) btnRefresh.title = t('btn_refresh_title');
+  const btnSnapshots = document.getElementById('btn-snapshots');
+  if (btnSnapshots) btnSnapshots.title = t('btn_snapshots_title');
+  const btnPrompts = document.getElementById('btn-prompts');
+  if (btnPrompts) btnPrompts.title = t('btn_prompts_title');
 
   // Status select options
   updateStatusSelectOptions('f-statut', false);
@@ -89,6 +93,9 @@ let widgetsConfig    = [];
 let widgetValues     = new Map();  // idx -> derniere valeur recuperee (string)
 let widgetTimers     = new Map();  // idx -> setInterval id
 
+let promptsConfig    = [];
+let editingPromptIdx = null;       // null = creation d un nouveau prompt
+
 // ─── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
   currentConfig = await window.taskAPI.getConfig();
@@ -108,6 +115,7 @@ async function init() {
   bindSettingsPanel();
   bindGuidePanel();
   bindSnapshotsPanel();
+  bindPromptsPanel();
   bindPreviewOverlay();
   bindAddForm();
 
@@ -139,10 +147,12 @@ async function init() {
     if (e.key === 'F5')     { e.preventDefault(); refreshTasks({ force: true }); }
     if (e.key === 'Escape') {
       closeModal();
+      closePromptModal();
       closeAllDropdowns();
       closeSidePanel('settings-overlay');
       closeSidePanel('guide-overlay');
       closeSidePanel('snapshots-overlay');
+      closeSidePanel('prompts-overlay');
       if (previewFilename) closePreview();
     }
   });
@@ -189,6 +199,7 @@ function bindHeaderButtons() {
   document.getElementById('btn-settings').addEventListener('click',   openSettingsPanel);
   document.getElementById('btn-guide').addEventListener('click',      openGuidePanel);
   document.getElementById('btn-snapshots').addEventListener('click',  openSnapshotsPanel);
+  document.getElementById('btn-prompts').addEventListener('click',    openPromptsPanel);
 }
 
 // ─── Refresh & rendu ──────────────────────────────────────────────────────────
@@ -1269,6 +1280,157 @@ en_cours | a_faire_rapidement | en_attente | bloque | fait | annule
   );
 }
 
+// ─── Gestionnaire de prompts ──────────────────────────────────────────────────
+// Stockage : currentConfig.prompts = [{ title, content }, ...]
+// L ordre est l ordre du tableau ; le bouton "decaler vers le bas" swap idx/idx+1.
+function bindPromptsPanel() {
+  const overlay = document.getElementById('prompts-overlay');
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeSidePanel('prompts-overlay'); });
+  document.getElementById('prompts-close').addEventListener('click', () => closeSidePanel('prompts-overlay'));
+  document.getElementById('btn-add-prompt').addEventListener('click', () => openPromptEditModal(null));
+
+  // Modal d edition
+  const mOverlay = document.getElementById('prompt-modal-overlay');
+  mOverlay.addEventListener('click', (e) => { if (e.target === mOverlay) closePromptModal(); });
+  document.getElementById('prompt-modal-close').addEventListener('click',  closePromptModal);
+  document.getElementById('prompt-modal-cancel').addEventListener('click', closePromptModal);
+  document.getElementById('prompt-modal-save').addEventListener('click',   savePromptFromModal);
+}
+
+async function openPromptsPanel() {
+  currentConfig = await window.taskAPI.getConfig();
+  promptsConfig = Array.isArray(currentConfig.prompts) ? currentConfig.prompts.slice() : [];
+  renderPromptsList();
+  openSidePanel('prompts-overlay');
+}
+
+function renderPromptsList() {
+  const container = document.getElementById('prompts-list');
+  if (!promptsConfig.length) {
+    container.innerHTML = `<div class="prompts-empty">
+      <div class="icon">\u{1F4DD}</div>
+      <div>${esc(t('prompts_empty') || 'Aucun prompt enregistre')}</div>
+    </div>`;
+    return;
+  }
+  const last = promptsConfig.length - 1;
+  let h = '';
+  promptsConfig.forEach((p, idx) => {
+    const titleSafe = esc(p.title || t('prompt_no_title') || '(sans titre)');
+    const tCopy   = esc(t('btn_prompt_copy_title')   || 'Copier dans le presse-papier');
+    const tEdit   = esc(t('btn_prompt_edit_title')   || 'Modifier');
+    const tDown   = esc(t('btn_prompt_down_title')   || 'Decaler vers le bas');
+    const tDelete = esc(t('btn_prompt_delete_title') || 'Supprimer');
+    const downDisabled = idx === last ? ' disabled' : '';
+    h += `<div class="prompt-item">`;
+    h += `<span class="prompt-title" onclick="openPromptEditModal(${idx})" title="${titleSafe}">${titleSafe}</span>`;
+    h += `<div class="prompt-actions">`;
+    h += `<button class="btn-prompt-act btn-prompt-copy"   onclick="copyPromptToClipboard(${idx}, this)" title="${tCopy}">\u{1F4CB}</button>`;
+    h += `<button class="btn-prompt-act btn-prompt-edit"   onclick="openPromptEditModal(${idx})" title="${tEdit}">✏️</button>`;
+    h += `<button class="btn-prompt-act btn-prompt-down"   onclick="movePromptDown(${idx})" title="${tDown}"${downDisabled}>⬇️</button>`;
+    h += `<button class="btn-prompt-act btn-prompt-delete" onclick="deletePrompt(${idx})" title="${tDelete}">\u{1F5D1}️</button>`;
+    h += `</div>`;
+    h += `</div>`;
+  });
+  container.innerHTML = h;
+}
+
+function openPromptEditModal(idx) {
+  editingPromptIdx = (typeof idx === 'number') ? idx : null;
+  const titleEl = document.getElementById('prompt-modal-title');
+  const inpTitle = document.getElementById('p-title');
+  const inpContent = document.getElementById('p-content');
+  if (editingPromptIdx === null) {
+    titleEl.textContent = t('prompt_modal_title_new') || 'Nouveau prompt';
+    inpTitle.value   = '';
+    inpContent.value = '';
+  } else {
+    const p = promptsConfig[editingPromptIdx] || { title: '', content: '' };
+    titleEl.textContent = t('prompt_modal_title_edit') || 'Modifier le prompt';
+    inpTitle.value   = p.title || '';
+    inpContent.value = p.content || '';
+  }
+  document.getElementById('prompt-modal-overlay').classList.add('visible');
+  setTimeout(() => { try { inpTitle.focus(); } catch (_) {} }, 50);
+}
+
+function closePromptModal() {
+  document.getElementById('prompt-modal-overlay').classList.remove('visible');
+  editingPromptIdx = null;
+}
+
+async function savePromptFromModal() {
+  const title   = (document.getElementById('p-title').value   || '').trim();
+  const content = (document.getElementById('p-content').value || '');
+  if (!title && !content) {
+    showToast(t('prompt_empty_error') || 'Titre ou contenu requis', 'error');
+    return;
+  }
+  const entry = { title: title || (t('prompt_no_title') || '(sans titre)'), content };
+  if (editingPromptIdx === null) {
+    promptsConfig.push(entry);
+  } else {
+    promptsConfig[editingPromptIdx] = entry;
+  }
+  await persistPromptsConfig();
+  closePromptModal();
+  renderPromptsList();
+  showToast(t('toast_prompt_saved') || 'Prompt enregistre', 'success');
+}
+
+async function deletePrompt(idx) {
+  const p = promptsConfig[idx];
+  if (!p) return;
+  const label = p.title || (t('prompt_no_title') || '(sans titre)');
+  const msg = (t('confirm_delete_prompt') || 'Supprimer le prompt "TITLE" ?').replace('TITLE', label);
+  if (!confirm(msg)) return;
+  promptsConfig.splice(idx, 1);
+  await persistPromptsConfig();
+  renderPromptsList();
+  showToast(t('toast_prompt_deleted') || 'Prompt supprime', 'success');
+}
+
+async function movePromptDown(idx) {
+  if (idx < 0 || idx >= promptsConfig.length - 1) return;
+  const a = promptsConfig[idx];
+  promptsConfig[idx] = promptsConfig[idx + 1];
+  promptsConfig[idx + 1] = a;
+  await persistPromptsConfig();
+  renderPromptsList();
+}
+
+async function copyPromptToClipboard(idx, btnEl) {
+  const p = promptsConfig[idx];
+  if (!p) return;
+  const text = p.content || '';
+  let ok = false;
+  // 1) Voie principale : clipboard Electron via IPC (insensible aux contraintes navigator)
+  if (window.taskAPI && window.taskAPI.copyToClipboard) {
+    try {
+      const r = await window.taskAPI.copyToClipboard(text);
+      ok = !!(r && r.ok);
+    } catch (_) { ok = false; }
+  }
+  // 2) Repli : navigator.clipboard (si la voie IPC echoue)
+  if (!ok) {
+    try { await navigator.clipboard.writeText(text); ok = true; } catch (_) { ok = false; }
+  }
+  if (ok) {
+    if (btnEl) {
+      btnEl.classList.add('copied');
+      setTimeout(() => btnEl.classList.remove('copied'), 1400);
+    }
+    showToast(t('toast_prompt_copied') || 'Prompt copie dans le presse-papier', 'success');
+  } else {
+    showToast(t('toast_prompt_copy_error') || 'Echec de la copie', 'error');
+  }
+}
+
+async function persistPromptsConfig() {
+  currentConfig = await window.taskAPI.saveConfig({ prompts: promptsConfig });
+  promptsConfig = Array.isArray(currentConfig.prompts) ? currentConfig.prompts.slice() : [];
+}
+
 // ─── Snapshots horaires ───────────────────────────────────────────────────────
 function bindSnapshotsPanel() {
   const overlay = document.getElementById('snapshots-overlay');
@@ -1439,6 +1601,10 @@ window.openEditModal   = openEditModal;
 window.doCloseTask     = doCloseTask;
 window.doDeleteTask    = doDeleteTask;
 window.doReleaseTask   = doReleaseTask;
-window.openPreview     = openPreview;
+window.openPreview         = openPreview;
+window.openPromptEditModal = openPromptEditModal;
+window.copyPromptToClipboard = copyPromptToClipboard;
+window.movePromptDown      = movePromptDown;
+window.deletePrompt        = deletePrompt;
 
 document.addEventListener('DOMContentLoaded', init);

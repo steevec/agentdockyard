@@ -20,6 +20,7 @@
     <span id="db-path-display" title=""></span>
     <div id="refresh-dot" title="Auto-refresh 30s"></div>
     <button id="btn-theme"     class="btn-header-icon" title="Changer de theme">&#x1F319;</button>
+    <button id="btn-prompts"   class="btn-header-icon" title="Gestionnaire de prompts">&#x1F4CB;</button>
     <button id="btn-snapshots" class="btn-header-icon" title="Historique des sauvegardes">&#x1F550;</button>
     <button id="btn-settings"  class="btn-header-icon" title="Parametres">&#x2699;&#xFE0F;</button>
     <button id="btn-guide"     class="btn-header-icon" title="Guide d'utilisation & prompt IA">&#x1F4D6;</button>
@@ -403,6 +404,47 @@
 
       </div>
 
+    </div>
+  </div>
+</div>
+
+<!-- Panneau lateral - Gestionnaire de prompts -->
+<div class="side-panel-overlay" id="prompts-overlay">
+  <div class="side-panel" id="prompts-panel">
+    <div class="side-panel-header">
+      <h2>&#x1F4CB; <span data-i18n="prompts_title">Gestionnaire de prompts</span></h2>
+      <button class="side-panel-close" id="prompts-close">&times;</button>
+    </div>
+    <div class="side-panel-body">
+      <p class="prompts-intro" data-i18n="prompts_intro">
+        Preparez vos prompts reutilisables. Le bouton Copier place le contenu dans le presse-papier, pret a etre colle ou vous voulez.
+      </p>
+      <div id="prompts-list"></div>
+      <button id="btn-add-prompt" class="btn-secondary" data-i18n="btn_add_prompt" style="margin-top:8px">+ Ajouter un prompt</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal edition d'un prompt -->
+<div id="prompt-modal-overlay">
+  <div id="prompt-modal">
+    <div id="prompt-modal-header">
+      <span id="prompt-modal-title" data-i18n="prompt_modal_title_edit">Modifier le prompt</span>
+      <button id="prompt-modal-close">&times;</button>
+    </div>
+    <div id="prompt-modal-body">
+      <div class="form-group">
+        <label data-i18n="prompt_title_label">Titre</label>
+        <input type="text" id="p-title" autocomplete="off" maxlength="200">
+      </div>
+      <div class="form-group">
+        <label data-i18n="prompt_content_label">Contenu</label>
+        <textarea id="p-content" rows="14"></textarea>
+      </div>
+    </div>
+    <div id="prompt-modal-footer">
+      <button class="btn-secondary" id="prompt-modal-cancel" data-i18n="btn_cancel">Annuler</button>
+      <button class="btn-save" id="prompt-modal-save" data-i18n="modal_btn_save">&#x1F4BE; Enregistrer</button>
     </div>
   </div>
 </div>

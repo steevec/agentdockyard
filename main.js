@@ -9,7 +9,7 @@
  * Watcher sur tasks.db pour notifier le renderer quand un agent externe ecrit.
  */
 
-const { app, BrowserWindow, ipcMain, screen, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, dialog, shell, clipboard } = require('electron');
 const path            = require('path');
 const fs              = require('fs');
 const http            = require('http');
@@ -122,6 +122,7 @@ const CONFIG_DEFAULT = {
     fullHeight: false,
   },
   widgets: [],
+  prompts: [],
 };
 
 function deepMerge(base, patch) {
@@ -707,6 +708,16 @@ ipcMain.handle('open-external', (event, url) => {
   if (typeof url !== 'string') return;
   if (!/^https?:\/\//i.test(url)) return;
   shell.openExternal(url);
+});
+
+ipcMain.handle('copy-to-clipboard', (event, text) => {
+  if (typeof text !== 'string') return { ok: false, error: 'Text expected' };
+  try {
+    clipboard.writeText(text);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
 });
 
 // ─── IPC : widgets (fetch URL cote main pour contourner CSP renderer) ─────────

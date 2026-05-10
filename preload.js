@@ -33,6 +33,7 @@ contextBridge.exposeInMainWorld('taskAPI', {
   exportJson:   ()           => ipcRenderer.invoke('export-json'),
   openDbFolder: ()           => ipcRenderer.invoke('open-db-folder'),
   openExternal: (url)        => ipcRenderer.invoke('open-external', url),
+  copyToClipboard: (text)    => ipcRenderer.invoke('copy-to-clipboard', text),
   checkUpdates: ()           => ipcRenderer.invoke('check-for-updates'),
 
   // ─── Widgets (fetch URL externes cote main process) ────────────────────────

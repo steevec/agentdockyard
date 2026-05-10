@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 _(nothing yet)_
 
+## [1.6.0] - 2026-05-10
+
+### Added
+- **Prompts manager** — a new clipboard icon in the header opens a side panel where you can keep a list of reusable prompts. Each prompt has a title and a free-form content, and the list is ordered manually. Per-prompt actions: **Copy** sends the content straight to the clipboard (Electron-side, with a `navigator.clipboard` fallback), **Edit** opens a dedicated modal with a large textarea, **Move down** swaps the prompt with the next one to reorder the list, and **Delete** removes the entry after confirmation. Useful for keeping handy the system prompts you keep pasting into AI tools, code review checklists, recurring instructions, etc. Stored in `config.json` under `prompts: []`, persisted via the existing settings pipeline.
+
 ## [1.5.1] - 2026-04-23
 
 ### Fixed
@@ -96,7 +101,10 @@ First public release.
 - Installer is unsigned — Windows SmartScreen warns on first launch.
 - No telemetry, no crash reporting — issues are to be reported manually on GitHub.
 
-[Unreleased]: https://github.com/steevec/agentdockyard/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/steevec/agentdockyard/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/steevec/agentdockyard/compare/v1.5.1...v1.6.0
+[1.5.1]: https://github.com/steevec/agentdockyard/compare/v1.5.0...v1.5.1
+[1.5.0]: https://github.com/steevec/agentdockyard/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/steevec/agentdockyard/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/steevec/agentdockyard/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/steevec/agentdockyard/compare/v1.1.0...v1.2.0

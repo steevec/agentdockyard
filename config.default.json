@@ -42,5 +42,6 @@
     "fullWidth": false,
     "fullHeight": false
   },
-  "widgets": []
+  "widgets": [],
+  "prompts": []
 }
