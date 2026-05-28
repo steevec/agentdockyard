@@ -94,7 +94,9 @@ let widgetValues     = new Map();  // idx -> derniere valeur recuperee (string)
 let widgetTimers     = new Map();  // idx -> setInterval id
 
 let promptsConfig    = [];
-let editingPromptIdx = null;       // null = creation d un nouveau prompt
+let editingPromptPath = null;      // null = creation ; sinon [idx] (racine) ou [folderIdx, childIdx]
+let editingFolderIdx  = null;      // null = creation dossier ; sinon idx du dossier
+let collapsedFolders  = new Set(); // ids des dossiers replies (UI uniquement)
 
 // ─── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
@@ -1281,29 +1283,74 @@ en_cours | a_faire_rapidement | en_attente | bloque | fait | annule
 }
 
 // ─── Gestionnaire de prompts ──────────────────────────────────────────────────
-// Stockage : currentConfig.prompts = [{ title, content }, ...]
-// L ordre est l ordre du tableau ; le bouton "decaler vers le bas" swap idx/idx+1.
+// Stockage : currentConfig.prompts = liste mixte de :
+//   - prompts a la racine     : { title, content }
+//   - dossiers (1 niveau max) : { type:'folder', id, name, children:[{title,content},...] }
+// Path : [idx] pour racine, [folderIdx, childIdx] pour un prompt dans un dossier.
 function bindPromptsPanel() {
   const overlay = document.getElementById('prompts-overlay');
   overlay.addEventListener('click', (e) => { if (e.target === overlay) closeSidePanel('prompts-overlay'); });
   document.getElementById('prompts-close').addEventListener('click', () => closeSidePanel('prompts-overlay'));
   document.getElementById('btn-add-prompt').addEventListener('click', () => openPromptEditModal(null));
+  document.getElementById('btn-add-folder').addEventListener('click', () => openFolderEditModal(null));
 
-  // Modal d edition
   const mOverlay = document.getElementById('prompt-modal-overlay');
   mOverlay.addEventListener('click', (e) => { if (e.target === mOverlay) closePromptModal(); });
   document.getElementById('prompt-modal-close').addEventListener('click',  closePromptModal);
   document.getElementById('prompt-modal-cancel').addEventListener('click', closePromptModal);
   document.getElementById('prompt-modal-save').addEventListener('click',   savePromptFromModal);
+
+  const fOverlay = document.getElementById('folder-modal-overlay');
+  fOverlay.addEventListener('click', (e) => { if (e.target === fOverlay) closeFolderModal(); });
+  document.getElementById('folder-modal-close').addEventListener('click',  closeFolderModal);
+  document.getElementById('folder-modal-cancel').addEventListener('click', closeFolderModal);
+  document.getElementById('folder-modal-save').addEventListener('click',   saveFolderFromModal);
+}
+
+// ─── Helpers modele de donnees ────────────────────────────────────────────────
+function isFolder(item) { return !!(item && item.type === 'folder'); }
+function newFolderId() { return 'f_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4); }
+
+function migratePromptsConfig(arr) {
+  if (!Array.isArray(arr)) return [];
+  return arr.map((item) => {
+    if (!item || typeof item !== 'object') return null;
+    if (isFolder(item)) {
+      return {
+        type: 'folder',
+        id: item.id || newFolderId(),
+        name: typeof item.name === 'string' ? item.name : '',
+        children: Array.isArray(item.children)
+          ? item.children.filter(c => c && typeof c === 'object' && !isFolder(c))
+                         .map(c => ({ title: c.title || '', content: c.content || '' }))
+          : [],
+      };
+    }
+    return { title: item.title || '', content: item.content || '' };
+  }).filter(x => x !== null);
+}
+
+function getItemByPath(path) {
+  if (!Array.isArray(path) || !path.length) return null;
+  const root = promptsConfig[path[0]];
+  if (path.length === 1) return root;
+  if (!isFolder(root)) return null;
+  return root.children[path[1]] || null;
+}
+
+function pathFromAttr(attr) {
+  if (!attr) return null;
+  return attr.split('.').map(n => parseInt(n, 10)).filter(n => !isNaN(n));
 }
 
 async function openPromptsPanel() {
   currentConfig = await window.taskAPI.getConfig();
-  promptsConfig = Array.isArray(currentConfig.prompts) ? currentConfig.prompts.slice() : [];
+  promptsConfig = migratePromptsConfig(currentConfig.prompts);
   renderPromptsList();
   openSidePanel('prompts-overlay');
 }
 
+// ─── Rendu de la liste hierarchique ───────────────────────────────────────────
 function renderPromptsList() {
   const container = document.getElementById('prompts-list');
   if (!promptsConfig.length) {
@@ -1313,105 +1360,541 @@ function renderPromptsList() {
     </div>`;
     return;
   }
-  const last = promptsConfig.length - 1;
+
+  const tCopy   = esc(t('btn_prompt_copy_title')   || 'Copier dans le presse-papier');
+  const tEdit   = esc(t('btn_prompt_edit_title')   || 'Modifier');
+  const tUp     = esc(t('btn_prompt_up_title')     || 'Monter');
+  const tDown   = esc(t('btn_prompt_down_title')   || 'Descendre');
+  const tDelete = esc(t('btn_prompt_delete_title') || 'Supprimer');
+  const tFolderEdit   = esc(t('btn_folder_edit_title')   || 'Renommer le dossier');
+  const tFolderDelete = esc(t('btn_folder_delete_title') || 'Supprimer le dossier');
+  const tFolderToggle = esc(t('btn_folder_toggle_title') || 'Replier / deplier');
+  const tDrop   = esc(t('drop_into_folder') || 'Glissez ici pour ajouter au dossier');
+
+  const lastRoot = promptsConfig.length - 1;
   let h = '';
-  promptsConfig.forEach((p, idx) => {
-    const titleSafe = esc(p.title || t('prompt_no_title') || '(sans titre)');
-    const tCopy   = esc(t('btn_prompt_copy_title')   || 'Copier dans le presse-papier');
-    const tEdit   = esc(t('btn_prompt_edit_title')   || 'Modifier');
-    const tDown   = esc(t('btn_prompt_down_title')   || 'Decaler vers le bas');
-    const tDelete = esc(t('btn_prompt_delete_title') || 'Supprimer');
-    const downDisabled = idx === last ? ' disabled' : '';
-    h += `<div class="prompt-item">`;
-    h += `<span class="prompt-title" onclick="openPromptEditModal(${idx})" title="${titleSafe}">${titleSafe}</span>`;
-    h += `<div class="prompt-actions">`;
-    h += `<button class="btn-prompt-act btn-prompt-copy"   onclick="copyPromptToClipboard(${idx}, this)" title="${tCopy}">\u{1F4CB}</button>`;
-    h += `<button class="btn-prompt-act btn-prompt-edit"   onclick="openPromptEditModal(${idx})" title="${tEdit}">✏️</button>`;
-    h += `<button class="btn-prompt-act btn-prompt-down"   onclick="movePromptDown(${idx})" title="${tDown}"${downDisabled}>⬇️</button>`;
-    h += `<button class="btn-prompt-act btn-prompt-delete" onclick="deletePrompt(${idx})" title="${tDelete}">\u{1F5D1}️</button>`;
-    h += `</div>`;
-    h += `</div>`;
+
+  promptsConfig.forEach((item, idx) => {
+    const path = String(idx);
+    const upDisabled   = idx === 0        ? ' disabled' : '';
+    const downDisabled = idx === lastRoot ? ' disabled' : '';
+
+    if (isFolder(item)) {
+      const folderName = esc(item.name || t('folder_no_name') || '(sans nom)');
+      const count = (item.children || []).length;
+      const collapsed = collapsedFolders.has(item.id);
+      const toggleIcon = collapsed ? '▶' : '▼';
+      const childrenCls = collapsed ? 'folder-children collapsed' : 'folder-children';
+
+      h += `<div class="folder-item" data-path="${path}">`;
+      h += `  <div class="folder-header" draggable="true" data-path="${path}">`;
+      h += `    <button class="folder-toggle" onclick="toggleFolderCollapse('${esc(item.id)}')" title="${tFolderToggle}">${toggleIcon}</button>`;
+      h += `    <span class="folder-icon">\u{1F4C1}</span>`;
+      h += `    <span class="folder-name" onclick="openFolderEditModal(${idx})" title="${folderName}">${folderName}</span>`;
+      h += `    <span class="folder-count">${count}</span>`;
+      h += `    <div class="folder-actions">`;
+      h += `      <button class="btn-prompt-act btn-prompt-up"     onclick="moveItemUp('${path}')"   title="${tUp}"${upDisabled}>⬆️</button>`;
+      h += `      <button class="btn-prompt-act btn-prompt-down"   onclick="moveItemDown('${path}')" title="${tDown}"${downDisabled}>⬇️</button>`;
+      h += `      <button class="btn-prompt-act btn-prompt-edit"   onclick="openFolderEditModal(${idx})" title="${tFolderEdit}">✏️</button>`;
+      h += `      <button class="btn-prompt-act btn-prompt-delete" onclick="deleteFolder(${idx})" title="${tFolderDelete}">\u{1F5D1}️</button>`;
+      h += `    </div>`;
+      h += `  </div>`;
+      h += `  <div class="${childrenCls}" data-folder-idx="${idx}">`;
+      if (count === 0) {
+        h += `    <div class="folder-empty">${tDrop}</div>`;
+      } else {
+        const lastChild = count - 1;
+        item.children.forEach((child, cidx) => {
+          const cPath = `${idx}.${cidx}`;
+          const cUpDis   = cidx === 0         ? ' disabled' : '';
+          const cDownDis = cidx === lastChild ? ' disabled' : '';
+          h += renderPromptHtml(child, cPath, cUpDis, cDownDis, tCopy, tEdit, tUp, tDown, tDelete);
+        });
+      }
+      h += `  </div>`;
+      h += `</div>`;
+    } else {
+      h += renderPromptHtml(item, path, upDisabled, downDisabled, tCopy, tEdit, tUp, tDown, tDelete);
+    }
   });
+
   container.innerHTML = h;
+  attachDragAndDrop(container);
+}
+
+function renderPromptHtml(p, path, upDis, downDis, tCopy, tEdit, tUp, tDown, tDelete) {
+  const titleSafe = esc(p.title || t('prompt_no_title') || '(sans titre)');
+  let h = '';
+  h += `<div class="prompt-item" draggable="true" data-path="${path}">`;
+  h += `<span class="drag-handle" title="${esc(t('drag_handle_title') || 'Glisser pour reorganiser')}">☰</span>`;
+  h += `<span class="prompt-title" onclick="openPromptEditModalByPath('${path}')" title="${titleSafe}">${titleSafe}</span>`;
+  h += `<div class="prompt-actions">`;
+  h += `<button class="btn-prompt-act btn-prompt-copy"   onclick="copyPromptToClipboardByPath('${path}', this)" title="${tCopy}">\u{1F4CB}</button>`;
+  h += `<button class="btn-prompt-act btn-prompt-edit"   onclick="openPromptEditModalByPath('${path}')" title="${tEdit}">✏️</button>`;
+  h += `<button class="btn-prompt-act btn-prompt-up"     onclick="moveItemUp('${path}')"   title="${tUp}"${upDis}>⬆️</button>`;
+  h += `<button class="btn-prompt-act btn-prompt-down"   onclick="moveItemDown('${path}')" title="${tDown}"${downDis}>⬇️</button>`;
+  h += `<button class="btn-prompt-act btn-prompt-delete" onclick="deletePromptByPath('${path}')" title="${tDelete}">\u{1F5D1}️</button>`;
+  h += `</div>`;
+  h += `</div>`;
+  return h;
+}
+
+function toggleFolderCollapse(folderId) {
+  if (collapsedFolders.has(folderId)) collapsedFolders.delete(folderId);
+  else collapsedFolders.add(folderId);
+  renderPromptsList();
+}
+
+// ─── Modal prompt ─────────────────────────────────────────────────────────────
+function buildFolderSelectOptions(selectedFolderIdx) {
+  const sel = document.getElementById('p-folder');
+  const rootLabel = esc(t('folder_root') || 'Racine (hors dossier)');
+  let opts = `<option value="">${rootLabel}</option>`;
+  promptsConfig.forEach((item, idx) => {
+    if (!isFolder(item)) return;
+    const name = esc(item.name || t('folder_no_name') || '(sans nom)');
+    const selAttr = (idx === selectedFolderIdx) ? ' selected' : '';
+    opts += `<option value="${idx}"${selAttr}>\u{1F4C1} ${name}</option>`;
+  });
+  sel.innerHTML = opts;
 }
 
 function openPromptEditModal(idx) {
-  editingPromptIdx = (typeof idx === 'number') ? idx : null;
-  const titleEl = document.getElementById('prompt-modal-title');
-  const inpTitle = document.getElementById('p-title');
+  openPromptEditModalByPath(idx === null || idx === undefined ? null : String(idx));
+}
+
+function openPromptEditModalByPath(pathStr) {
+  editingPromptPath = pathStr === null ? null : pathFromAttr(pathStr);
+  const titleEl    = document.getElementById('prompt-modal-title');
+  const inpTitle   = document.getElementById('p-title');
   const inpContent = document.getElementById('p-content');
-  if (editingPromptIdx === null) {
+
+  let currentFolderIdx = null;
+  let p = { title: '', content: '' };
+
+  if (editingPromptPath === null) {
     titleEl.textContent = t('prompt_modal_title_new') || 'Nouveau prompt';
-    inpTitle.value   = '';
-    inpContent.value = '';
   } else {
-    const p = promptsConfig[editingPromptIdx] || { title: '', content: '' };
+    const it = getItemByPath(editingPromptPath);
+    if (it && !isFolder(it)) p = it;
     titleEl.textContent = t('prompt_modal_title_edit') || 'Modifier le prompt';
-    inpTitle.value   = p.title || '';
-    inpContent.value = p.content || '';
+    if (editingPromptPath.length === 2) currentFolderIdx = editingPromptPath[0];
   }
+
+  inpTitle.value   = p.title   || '';
+  inpContent.value = p.content || '';
+  buildFolderSelectOptions(currentFolderIdx);
+
   document.getElementById('prompt-modal-overlay').classList.add('visible');
   setTimeout(() => { try { inpTitle.focus(); } catch (_) {} }, 50);
 }
 
 function closePromptModal() {
   document.getElementById('prompt-modal-overlay').classList.remove('visible');
-  editingPromptIdx = null;
+  editingPromptPath = null;
 }
 
 async function savePromptFromModal() {
   const title   = (document.getElementById('p-title').value   || '').trim();
   const content = (document.getElementById('p-content').value || '');
+  const folderSelVal = document.getElementById('p-folder').value;
+  const targetFolderIdx = folderSelVal === '' ? null : parseInt(folderSelVal, 10);
+
   if (!title && !content) {
     showToast(t('prompt_empty_error') || 'Titre ou contenu requis', 'error');
     return;
   }
   const entry = { title: title || (t('prompt_no_title') || '(sans titre)'), content };
-  if (editingPromptIdx === null) {
-    promptsConfig.push(entry);
+
+  if (editingPromptPath === null) {
+    if (targetFolderIdx === null) {
+      promptsConfig.push(entry);
+    } else {
+      const f = promptsConfig[targetFolderIdx];
+      if (isFolder(f)) f.children.push(entry); else promptsConfig.push(entry);
+    }
   } else {
-    promptsConfig[editingPromptIdx] = entry;
+    let adjFolderIdx = targetFolderIdx;
+    if (targetFolderIdx !== null
+        && editingPromptPath.length === 1
+        && editingPromptPath[0] < targetFolderIdx) {
+      adjFolderIdx = targetFolderIdx - 1;
+    }
+    removeItemAtPath(editingPromptPath);
+    if (adjFolderIdx === null) {
+      promptsConfig.push(entry);
+    } else {
+      const f = promptsConfig[adjFolderIdx];
+      if (isFolder(f)) f.children.push(entry); else promptsConfig.push(entry);
+    }
   }
+
   await persistPromptsConfig();
   closePromptModal();
   renderPromptsList();
   showToast(t('toast_prompt_saved') || 'Prompt enregistre', 'success');
 }
 
-async function deletePrompt(idx) {
-  const p = promptsConfig[idx];
-  if (!p) return;
+function removeItemAtPath(path) {
+  if (!Array.isArray(path)) return null;
+  if (path.length === 1) {
+    return promptsConfig.splice(path[0], 1)[0];
+  }
+  const f = promptsConfig[path[0]];
+  if (!isFolder(f)) return null;
+  return f.children.splice(path[1], 1)[0];
+}
+
+async function deletePromptByPath(pathStr) {
+  const path = pathFromAttr(pathStr);
+  const p = getItemByPath(path);
+  if (!p || isFolder(p)) return;
   const label = p.title || (t('prompt_no_title') || '(sans titre)');
   const msg = (t('confirm_delete_prompt') || 'Supprimer le prompt "TITLE" ?').replace('TITLE', label);
   if (!confirm(msg)) return;
-  promptsConfig.splice(idx, 1);
+  removeItemAtPath(path);
   await persistPromptsConfig();
   renderPromptsList();
   showToast(t('toast_prompt_deleted') || 'Prompt supprime', 'success');
 }
 
-async function movePromptDown(idx) {
-  if (idx < 0 || idx >= promptsConfig.length - 1) return;
-  const a = promptsConfig[idx];
-  promptsConfig[idx] = promptsConfig[idx + 1];
-  promptsConfig[idx + 1] = a;
+// ─── Modal dossier ────────────────────────────────────────────────────────────
+function openFolderEditModal(idx) {
+  editingFolderIdx = (typeof idx === 'number') ? idx : null;
+  const titleEl = document.getElementById('folder-modal-title');
+  const inp = document.getElementById('f-name');
+  if (editingFolderIdx === null) {
+    titleEl.textContent = t('folder_modal_title_new') || 'Nouveau dossier';
+    inp.value = '';
+  } else {
+    const f = promptsConfig[editingFolderIdx];
+    if (!isFolder(f)) return;
+    titleEl.textContent = t('folder_modal_title_edit') || 'Renommer le dossier';
+    inp.value = f.name || '';
+  }
+  document.getElementById('folder-modal-overlay').classList.add('visible');
+  setTimeout(() => { try { inp.focus(); inp.select(); } catch (_) {} }, 50);
+}
+
+function closeFolderModal() {
+  document.getElementById('folder-modal-overlay').classList.remove('visible');
+  editingFolderIdx = null;
+}
+
+async function saveFolderFromModal() {
+  const name = (document.getElementById('f-name').value || '').trim();
+  if (!name) {
+    showToast(t('folder_name_required') || 'Nom requis', 'error');
+    return;
+  }
+  if (editingFolderIdx === null) {
+    promptsConfig.push({ type: 'folder', id: newFolderId(), name, children: [] });
+  } else {
+    const f = promptsConfig[editingFolderIdx];
+    if (isFolder(f)) f.name = name;
+  }
+  await persistPromptsConfig();
+  closeFolderModal();
+  renderPromptsList();
+  showToast(t('toast_folder_saved') || 'Dossier enregistre', 'success');
+}
+
+async function deleteFolder(idx) {
+  const f = promptsConfig[idx];
+  if (!isFolder(f)) return;
+  const name = f.name || (t('folder_no_name') || '(sans nom)');
+  const count = (f.children || []).length;
+  let msg;
+  if (count === 0) {
+    msg = (t('confirm_delete_folder_empty') || 'Supprimer le dossier "NAME" ?').replace('NAME', name);
+    if (!confirm(msg)) return;
+    promptsConfig.splice(idx, 1);
+  } else {
+    msg = (t('confirm_delete_folder_with_children') || 'Le dossier "NAME" contient COUNT prompt(s). Les prompts seront deplaces a la racine. Continuer ?')
+            .replace('NAME', name).replace('COUNT', String(count));
+    if (!confirm(msg)) return;
+    const kids = f.children.slice();
+    promptsConfig.splice(idx, 1);
+    promptsConfig.push(...kids);
+  }
+  await persistPromptsConfig();
+  renderPromptsList();
+  showToast(t('toast_folder_deleted') || 'Dossier supprime', 'success');
+}
+
+// ─── Reordonnancement par fleches ─────────────────────────────────────────────
+async function moveItemUp(pathStr)   { await moveItem(pathFromAttr(pathStr), -1); }
+async function moveItemDown(pathStr) { await moveItem(pathFromAttr(pathStr), +1); }
+
+async function moveItem(path, delta) {
+  if (!Array.isArray(path) || !path.length) return;
+  if (path.length === 1) {
+    const i = path[0];
+    const j = i + delta;
+    if (j < 0 || j >= promptsConfig.length) return;
+    const a = promptsConfig[i];
+    promptsConfig[i] = promptsConfig[j];
+    promptsConfig[j] = a;
+  } else {
+    const f = promptsConfig[path[0]];
+    if (!isFolder(f)) return;
+    const i = path[1];
+    const j = i + delta;
+    if (j < 0 || j >= f.children.length) return;
+    const a = f.children[i];
+    f.children[i] = f.children[j];
+    f.children[j] = a;
+  }
   await persistPromptsConfig();
   renderPromptsList();
 }
 
-async function copyPromptToClipboard(idx, btnEl) {
-  const p = promptsConfig[idx];
-  if (!p) return;
+// ─── Drag and drop natif HTML5 ────────────────────────────────────────────────
+let dragSourcePath = null;
+
+function attachDragAndDrop(container) {
+  const draggables = container.querySelectorAll('[draggable="true"]');
+  draggables.forEach(el => {
+    el.addEventListener('dragstart', onDragStart);
+    el.addEventListener('dragend',   onDragEnd);
+  });
+
+  const items = container.querySelectorAll('.prompt-item, .folder-header');
+  items.forEach(el => {
+    el.addEventListener('dragover',  onDragOverItem);
+    el.addEventListener('dragleave', onDragLeaveItem);
+    el.addEventListener('drop',      onDropOnItem);
+  });
+
+  const folderChildrens = container.querySelectorAll('.folder-children');
+  folderChildrens.forEach(el => {
+    el.addEventListener('dragenter', onDragOverFolder);
+    el.addEventListener('dragover',  onDragOverFolder);
+    el.addEventListener('dragleave', onDragLeaveFolder);
+    el.addEventListener('drop',      onDropOnFolder);
+  });
+
+  const folderEmpties = container.querySelectorAll('.folder-empty');
+  folderEmpties.forEach(el => {
+    el.addEventListener('dragenter', onDragOverFolderEmpty);
+    el.addEventListener('dragover',  onDragOverFolderEmpty);
+    el.addEventListener('drop',      onDropOnFolderEmpty);
+  });
+
+  if (!container._dndBound) {
+    container.addEventListener('dragover',  onDragOverList);
+    container.addEventListener('drop',      onDropOnList);
+    container._dndBound = true;
+  }
+}
+
+function onDragStart(e) {
+  const el = e.currentTarget;
+  dragSourcePath = el.getAttribute('data-path');
+  e.dataTransfer.effectAllowed = 'move';
+  try { e.dataTransfer.setData('text/plain', dragSourcePath); } catch (_) {}
+  el.classList.add('dragging');
+}
+function onDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('.drop-before, .drop-after, .drop-inside')
+          .forEach(n => n.classList.remove('drop-before', 'drop-after', 'drop-inside'));
+  dragSourcePath = null;
+}
+
+function clearDropMarks(el) {
+  el.classList.remove('drop-before', 'drop-after', 'drop-inside');
+}
+
+function onDragOverItem(e) {
+  if (!dragSourcePath) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const el = e.currentTarget;
+  const rect = el.getBoundingClientRect();
+  const y = e.clientY - rect.top;
+  clearDropMarks(el);
+  if (y < rect.height / 2) el.classList.add('drop-before');
+  else                     el.classList.add('drop-after');
+}
+function onDragLeaveItem(e) { clearDropMarks(e.currentTarget); }
+
+function onDropOnItem(e) {
+  if (!dragSourcePath) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const el = e.currentTarget;
+  const targetPath = pathFromAttr(el.getAttribute('data-path'));
+  const sourcePath = pathFromAttr(dragSourcePath);
+  const rect = el.getBoundingClientRect();
+  const before = (e.clientY - rect.top) < rect.height / 2;
+  clearDropMarks(el);
+  handleDropAtPosition(sourcePath, targetPath, before ? 'before' : 'after');
+}
+
+function onDragOverFolder(e) {
+  if (!dragSourcePath) return;
+  const sourcePath = pathFromAttr(dragSourcePath);
+  const sourceItem = getItemByPath(sourcePath);
+  if (isFolder(sourceItem)) return;
+  e.preventDefault();
+  e.stopPropagation();
+  e.dataTransfer.dropEffect = 'move';
+  e.currentTarget.classList.add('drop-inside');
+}
+function onDragLeaveFolder(e) {
+  const related = e.relatedTarget;
+  if (related && e.currentTarget.contains(related)) return;
+  e.currentTarget.classList.remove('drop-inside');
+}
+
+function onDropOnFolder(e) {
+  if (!dragSourcePath) return;
+  const sourcePath = pathFromAttr(dragSourcePath);
+  const sourceItem = getItemByPath(sourcePath);
+  if (isFolder(sourceItem)) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const el = e.currentTarget;
+  el.classList.remove('drop-inside');
+  const folderIdx = parseInt(el.getAttribute('data-folder-idx'), 10);
+  handleDropIntoFolder(sourcePath, folderIdx);
+}
+
+function onDragOverFolderEmpty(e) {
+  if (!dragSourcePath) return;
+  const sourceItem = getItemByPath(pathFromAttr(dragSourcePath));
+  if (isFolder(sourceItem)) return;
+  e.preventDefault();
+  e.stopPropagation();
+  e.dataTransfer.dropEffect = 'move';
+  const children = e.currentTarget.closest('.folder-children');
+  if (children) children.classList.add('drop-inside');
+}
+function onDropOnFolderEmpty(e) {
+  if (!dragSourcePath) return;
+  const sourcePath = pathFromAttr(dragSourcePath);
+  const sourceItem = getItemByPath(sourcePath);
+  if (isFolder(sourceItem)) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const children = e.currentTarget.closest('.folder-children');
+  if (!children) return;
+  children.classList.remove('drop-inside');
+  const folderIdx = parseInt(children.getAttribute('data-folder-idx'), 10);
+  handleDropIntoFolder(sourcePath, folderIdx);
+}
+
+function onDragOverList(e) {
+  if (!dragSourcePath) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+}
+function onDropOnList(e) {
+  if (!dragSourcePath) return;
+  if (e.target.closest('.prompt-item, .folder-header, .folder-children')) return;
+  e.preventDefault();
+  const sourcePath = pathFromAttr(dragSourcePath);
+  handleDropAtRootEnd(sourcePath);
+}
+
+function pathsEqual(a, b) {
+  if (!a || !b || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
+async function handleDropAtPosition(sourcePath, targetPath, mode) {
+  if (pathsEqual(sourcePath, targetPath)) return;
+  const sourceItem = getItemByPath(sourcePath);
+  if (!sourceItem) return;
+
+  const targetIsFolder = isFolder(getItemByPath(targetPath));
+  const sourceIsFolder = isFolder(sourceItem);
+
+  if (sourceIsFolder && targetPath.length === 2) return;
+
+  removeItemAtPath(sourcePath);
+
+  const adjTarget = adjustPathAfterRemoval(sourcePath, targetPath);
+  if (!adjTarget) { await persistPromptsConfig(); renderPromptsList(); return; }
+
+  if (adjTarget.length === 1) {
+    let insertAt = adjTarget[0] + (mode === 'after' ? 1 : 0);
+    insertAt = Math.max(0, Math.min(insertAt, promptsConfig.length));
+    promptsConfig.splice(insertAt, 0, sourceItem);
+  } else {
+    const folder = promptsConfig[adjTarget[0]];
+    if (!isFolder(folder)) { promptsConfig.push(sourceItem); }
+    else {
+      if (sourceIsFolder) { promptsConfig.push(sourceItem); }
+      else {
+        let insertAt = adjTarget[1] + (mode === 'after' ? 1 : 0);
+        insertAt = Math.max(0, Math.min(insertAt, folder.children.length));
+        folder.children.splice(insertAt, 0, sourceItem);
+      }
+    }
+  }
+
+  await persistPromptsConfig();
+  renderPromptsList();
+  void targetIsFolder;
+}
+
+async function handleDropIntoFolder(sourcePath, folderIdx) {
+  const sourceItem = getItemByPath(sourcePath);
+  if (!sourceItem || isFolder(sourceItem)) return;
+  if (sourcePath.length === 2 && sourcePath[0] === folderIdx) return;
+
+  removeItemAtPath(sourcePath);
+
+  let adjFolderIdx = folderIdx;
+  if (sourcePath.length === 1 && sourcePath[0] < folderIdx) adjFolderIdx = folderIdx - 1;
+
+  const folder = promptsConfig[adjFolderIdx];
+  if (!isFolder(folder)) { promptsConfig.push(sourceItem); }
+  else folder.children.push(sourceItem);
+
+  await persistPromptsConfig();
+  renderPromptsList();
+}
+
+async function handleDropAtRootEnd(sourcePath) {
+  const sourceItem = getItemByPath(sourcePath);
+  if (!sourceItem) return;
+  removeItemAtPath(sourcePath);
+  promptsConfig.push(sourceItem);
+  await persistPromptsConfig();
+  renderPromptsList();
+}
+
+function adjustPathAfterRemoval(removedPath, targetPath) {
+  if (!targetPath) return null;
+  const r = removedPath.slice();
+  const t = targetPath.slice();
+
+  if (r.length === 1) {
+    if (t[0] === r[0]) return null;
+    if (t[0] >  r[0]) t[0] -= 1;
+    return t;
+  }
+  if (t.length === 2 && t[0] === r[0] && t[1] === r[1]) return null;
+  if (t.length === 2 && t[0] === r[0] && t[1] > r[1]) t[1] -= 1;
+  return t;
+}
+
+// ─── Copie clipboard ──────────────────────────────────────────────────────────
+async function copyPromptToClipboardByPath(pathStr, btnEl) {
+  const p = getItemByPath(pathFromAttr(pathStr));
+  if (!p || isFolder(p)) return;
   const text = p.content || '';
   let ok = false;
-  // 1) Voie principale : clipboard Electron via IPC (insensible aux contraintes navigator)
   if (window.taskAPI && window.taskAPI.copyToClipboard) {
     try {
       const r = await window.taskAPI.copyToClipboard(text);
       ok = !!(r && r.ok);
     } catch (_) { ok = false; }
   }
-  // 2) Repli : navigator.clipboard (si la voie IPC echoue)
   if (!ok) {
     try { await navigator.clipboard.writeText(text); ok = true; } catch (_) { ok = false; }
   }
@@ -1428,7 +1911,7 @@ async function copyPromptToClipboard(idx, btnEl) {
 
 async function persistPromptsConfig() {
   currentConfig = await window.taskAPI.saveConfig({ prompts: promptsConfig });
-  promptsConfig = Array.isArray(currentConfig.prompts) ? currentConfig.prompts.slice() : [];
+  promptsConfig = migratePromptsConfig(currentConfig.prompts);
 }
 
 // ─── Snapshots horaires ───────────────────────────────────────────────────────
@@ -1602,9 +2085,14 @@ window.doCloseTask     = doCloseTask;
 window.doDeleteTask    = doDeleteTask;
 window.doReleaseTask   = doReleaseTask;
 window.openPreview         = openPreview;
-window.openPromptEditModal = openPromptEditModal;
-window.copyPromptToClipboard = copyPromptToClipboard;
-window.movePromptDown      = movePromptDown;
-window.deletePrompt        = deletePrompt;
+window.openPromptEditModal       = openPromptEditModal;
+window.openPromptEditModalByPath = openPromptEditModalByPath;
+window.copyPromptToClipboardByPath = copyPromptToClipboardByPath;
+window.moveItemUp                = moveItemUp;
+window.moveItemDown              = moveItemDown;
+window.deletePromptByPath        = deletePromptByPath;
+window.openFolderEditModal       = openFolderEditModal;
+window.deleteFolder              = deleteFolder;
+window.toggleFolderCollapse      = toggleFolderCollapse;
 
 document.addEventListener('DOMContentLoaded', init);

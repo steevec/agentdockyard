@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 _(nothing yet)_
 
+## [1.7.0] - 2026-05-28
+
+### Added
+- **Prompts manager — folders and drag-and-drop reorganisation** — the prompts side panel now supports one level of folders to group your reusable prompts by topic. A new **+ Add a folder** button creates a named folder, and the existing prompt modal gains a **Folder** dropdown so you can file a prompt under the root or any existing folder, both at creation and when editing (move a prompt across folders without retyping it). Each folder header shows its prompt count and a ▶/▼ chevron to collapse or expand. Reorganise everything either with **native HTML5 drag-and-drop** (drop between two items, into a folder's child area, or back to the root for folders) or with new **⬆️ / ⬇️ arrow buttons** available on every prompt and folder, at every depth. Deleting a non-empty folder asks for confirmation and reparents its prompts to the root rather than losing them. Existing flat prompt lists keep working as-is thanks to a transparent in-memory migration that preserves every entry.
+
 ## [1.6.0] - 2026-05-10
 
 ### Added

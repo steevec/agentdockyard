@@ -420,7 +420,10 @@
         Preparez vos prompts reutilisables. Le bouton Copier place le contenu dans le presse-papier, pret a etre colle ou vous voulez.
       </p>
       <div id="prompts-list"></div>
-      <button id="btn-add-prompt" class="btn-secondary" data-i18n="btn_add_prompt" style="margin-top:8px">+ Ajouter un prompt</button>
+      <div class="prompts-add-actions" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+        <button id="btn-add-prompt" class="btn-secondary" data-i18n="btn_add_prompt">+ Ajouter un prompt</button>
+        <button id="btn-add-folder" class="btn-secondary" data-i18n="btn_add_folder">+ Ajouter un dossier</button>
+      </div>
     </div>
   </div>
 </div>
@@ -438,6 +441,10 @@
         <input type="text" id="p-title" autocomplete="off" maxlength="200">
       </div>
       <div class="form-group">
+        <label data-i18n="prompt_folder_label">Dossier</label>
+        <select id="p-folder"></select>
+      </div>
+      <div class="form-group">
         <label data-i18n="prompt_content_label">Contenu</label>
         <textarea id="p-content" rows="14"></textarea>
       </div>
@@ -445,6 +452,26 @@
     <div id="prompt-modal-footer">
       <button class="btn-secondary" id="prompt-modal-cancel" data-i18n="btn_cancel">Annuler</button>
       <button class="btn-save" id="prompt-modal-save" data-i18n="modal_btn_save">&#x1F4BE; Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal edition d'un dossier -->
+<div id="folder-modal-overlay">
+  <div id="folder-modal">
+    <div id="folder-modal-header">
+      <span id="folder-modal-title" data-i18n="folder_modal_title_new">Nouveau dossier</span>
+      <button id="folder-modal-close">&times;</button>
+    </div>
+    <div id="folder-modal-body">
+      <div class="form-group">
+        <label data-i18n="folder_name_label">Nom du dossier</label>
+        <input type="text" id="f-name" autocomplete="off" maxlength="120">
+      </div>
+    </div>
+    <div id="folder-modal-footer">
+      <button class="btn-secondary" id="folder-modal-cancel" data-i18n="btn_cancel">Annuler</button>
+      <button class="btn-save" id="folder-modal-save" data-i18n="modal_btn_save">&#x1F4BE; Enregistrer</button>
     </div>
   </div>
 </div>
