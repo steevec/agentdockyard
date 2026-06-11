@@ -87,7 +87,10 @@ function callAgentRaw(payload, options) {
     let child;
 
     try {
-      child = spawn(bin, args);
+      // windowsHide obligatoire : agent.exe est une app console et le défaut
+      // Node est false — sans lui, chaque appel API fait flasher une fenêtre
+      // console qui vole le focus clavier.
+      child = spawn(bin, args, { windowsHide: true });
     } catch (err) {
       resolve({
         stdout: '',

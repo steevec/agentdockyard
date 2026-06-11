@@ -167,7 +167,7 @@ let httpApiServer = null;
 function detectPython() {
   for (const cmd of ['python', 'python3', 'py']) {
     try {
-      const r = spawnSync(cmd, ['--version'], { encoding: 'utf8', timeout: 5000 });
+      const r = spawnSync(cmd, ['--version'], { encoding: 'utf8', timeout: 5000, windowsHide: true });
       if (!r.error && r.status === 0) return cmd;
     } catch (_) { /* ignore */ }
   }
@@ -197,9 +197,12 @@ function callAgent(payload, dbPathOverride) {
     // de suite. Un setTimeout qui referencerait un child jamais initialise
     // crashe le main process en TDZ (ReferenceError: Cannot access 'child'
     // before initialization) des que le timer fire.
+    // windowsHide obligatoire : agent.exe est une app console et le défaut
+    // Node est false — sans lui, Windows crée une fenêtre visible qui flashe
+    // et vole le focus clavier à chaque appel.
     let child;
     try {
-      child = spawn(bin, args);
+      child = spawn(bin, args, { windowsHide: true });
     } catch (err) {
       console.error('[callAgent] spawn a lance une exception :', err && err.message);
       return resolve({ statut: 'NOK', message: 'Spawn impossible : ' + (err && err.message || 'erreur inconnue') });

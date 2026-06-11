@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 _(nothing yet)_
 
+## [1.7.1] - 2026-06-11
+
+### Fixed
+- **Console window flashing and stealing keyboard focus on every agent call** — `agent.exe` is a console binary, and both the Electron UI (`callAgent` in `main.js`) and the local HTTP API (`http-api.js`) spawned it without the `windowsHide` option, whose Node.js default is `false`. Windows therefore created a real, visible console window for each call: it popped up for a fraction of a second and stole the keyboard focus from whatever the user was typing — several times a day, every time an AI agent created, claimed, updated or closed a task through the HTTP API. All `spawn`/`spawnSync` call sites now pass `windowsHide: true` (`CREATE_NO_WINDOW`), so the agent process runs completely invisible.
+
 ## [1.7.0] - 2026-05-28
 
 ### Added
