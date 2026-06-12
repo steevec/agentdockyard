@@ -211,6 +211,10 @@ window.I18N = {
     // Empty state
     empty_no_tasks: 'No active tasks',
     empty_loading: 'Loading...',
+    // Search
+    search_placeholder: 'Search (number or text)...',
+    search_clear_title: 'Clear search',
+    search_no_results: 'No task matches this search',
     // Tasks count
     tasks_active_one: 'active task',
     tasks_active_many: 'active tasks',
@@ -432,6 +436,10 @@ window.I18N = {
     guide_cmd_exporter:   'Exporter toutes les tâches',
     empty_no_tasks: 'Aucune tâche en cours',
     empty_loading: 'Chargement...',
+    // Recherche
+    search_placeholder: 'Rechercher (numéro ou texte)...',
+    search_clear_title: 'Effacer la recherche',
+    search_no_results: 'Aucune tâche ne correspond à cette recherche',
     tasks_active_one: 'tâche active',
     tasks_active_many: 'tâches actives',
     repo_todo_one: 'à faire',
@@ -597,6 +605,10 @@ window.I18N = {
     guide_cmd_exporter:   'Alle Aufgaben exportieren',
     empty_no_tasks: 'Keine aktiven Aufgaben',
     empty_loading: 'Laden...',
+    // Suche
+    search_placeholder: 'Suchen (Nummer oder Text)...',
+    search_clear_title: 'Suche löschen',
+    search_no_results: 'Keine Aufgabe entspricht dieser Suche',
     tasks_active_one: 'aktive Aufgabe',
     tasks_active_many: 'aktive Aufgaben',
     repo_todo_one: 'offen',
@@ -762,6 +774,10 @@ window.I18N = {
     guide_cmd_exporter:   'Exportar todas las tareas',
     empty_no_tasks: 'No hay tareas activas',
     empty_loading: 'Cargando...',
+    // Búsqueda
+    search_placeholder: 'Buscar (número o texto)...',
+    search_clear_title: 'Borrar búsqueda',
+    search_no_results: 'Ninguna tarea coincide con esta búsqueda',
     tasks_active_one: 'tarea activa',
     tasks_active_many: 'tareas activas',
     repo_todo_one: 'por hacer',
@@ -927,6 +943,10 @@ window.I18N = {
     guide_cmd_exporter:   'Esportare tutti i compiti',
     empty_no_tasks: 'Nessun compito attivo',
     empty_loading: 'Caricamento...',
+    // Ricerca
+    search_placeholder: 'Cerca (numero o testo)...',
+    search_clear_title: 'Cancella ricerca',
+    search_no_results: 'Nessun compito corrisponde a questa ricerca',
     tasks_active_one: 'compito attivo',
     tasks_active_many: 'compiti attivi',
     repo_todo_one: 'da fare',
@@ -1092,6 +1112,10 @@ window.I18N = {
     guide_cmd_exporter:   'Exportar todas as tarefas',
     empty_no_tasks: 'Nenhuma tarefa ativa',
     empty_loading: 'Carregando...',
+    // Pesquisa
+    search_placeholder: 'Pesquisar (número ou texto)...',
+    search_clear_title: 'Limpar pesquisa',
+    search_no_results: 'Nenhuma tarefa corresponde a esta pesquisa',
     tasks_active_one: 'tarefa ativa',
     tasks_active_many: 'tarefas ativas',
     repo_todo_one: 'a fazer',
@@ -1257,6 +1281,10 @@ window.I18N = {
     guide_cmd_exporter:   '导出所有任务',
     empty_no_tasks: '没有活跃任务',
     empty_loading: '加载中...',
+    // 搜索
+    search_placeholder: '搜索（编号或文本）...',
+    search_clear_title: '清除搜索',
+    search_no_results: '没有任务符合此搜索',
     tasks_active_one: '个活跃任务',
     tasks_active_many: '个活跃任务',
     repo_todo_one: '个待办任务',
@@ -1422,6 +1450,10 @@ window.I18N = {
     guide_cmd_exporter:   'すべてのタスクをエクスポート',
     empty_no_tasks: 'アクティブなタスクなし',
     empty_loading: '読み込み中...',
+    // 検索
+    search_placeholder: '検索（番号またはテキスト）...',
+    search_clear_title: '検索をクリア',
+    search_no_results: 'この検索に一致するタスクはありません',
     tasks_active_one: '件のアクティブタスク',
     tasks_active_many: '件のアクティブタスク',
     repo_todo_one: '件の未完了タスク',
@@ -1587,6 +1619,10 @@ window.I18N = {
     guide_cmd_exporter:   'सभी कार्य निर्यात करें',
     empty_no_tasks: 'कोई सक्रिय कार्य नहीं',
     empty_loading: 'लोड हो रहा है...',
+    // खोज
+    search_placeholder: 'खोजें (संख्या या टेक्स्ट)...',
+    search_clear_title: 'खोज साफ़ करें',
+    search_no_results: 'इस खोज से कोई कार्य मेल नहीं खाता',
     tasks_active_one: 'सक्रिय कार्य',
     tasks_active_many: 'सक्रिय कार्य',
     repo_todo_one: 'करना बाकी',

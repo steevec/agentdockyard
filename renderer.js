@@ -33,6 +33,10 @@ function applyI18n() {
   if (fContexte) fContexte.placeholder = t('form_contexte_ph');
   const fNote = document.getElementById('f-note');
   if (fNote) fNote.placeholder = t('form_note_ph');
+  const searchInput = document.getElementById('search-input');
+  if (searchInput) searchInput.placeholder = t('search_placeholder');
+  const searchClear = document.getElementById('search-clear');
+  if (searchClear) searchClear.title = t('search_clear_title');
 
   // Titles (tooltip)
   const btnTheme = document.getElementById('btn-theme');
@@ -87,6 +91,7 @@ let dbRefreshTimer   = null;
 let lastRenderKey    = '';
 let pendingAutoRefresh = false;
 let addBarOpen       = false;
+let searchQuery      = '';    // texte de recherche en cours (vide = pas de filtre)
 let previewFilename  = null;  // snapshot en cours d'apercu (null = pas en mode preview)
 
 let widgetsConfig    = [];
@@ -108,11 +113,8 @@ async function init() {
   applyTheme(currentConfig.theme || 'dark');
   populateAgentSelects();
 
-  const dbPath = await window.taskAPI.getDbPath();
-  document.getElementById('db-path-display').textContent = truncatePath(dbPath, 50);
-  document.getElementById('db-path-display').title = dbPath;
-
   bindHeaderButtons();
+  bindSearchBox();
   bindModal();
   bindSettingsPanel();
   bindGuidePanel();
@@ -147,6 +149,11 @@ async function init() {
 
   document.addEventListener('keydown', e => {
     if (e.key === 'F5')     { e.preventDefault(); refreshTasks({ force: true }); }
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
+      e.preventDefault();
+      const si = document.getElementById('search-input');
+      if (si) { si.focus(); si.select(); }
+    }
     if (e.key === 'Escape') {
       closeModal();
       closePromptModal();
@@ -202,6 +209,36 @@ function bindHeaderButtons() {
   document.getElementById('btn-guide').addEventListener('click',      openGuidePanel);
   document.getElementById('btn-snapshots').addEventListener('click',  openSnapshotsPanel);
   document.getElementById('btn-prompts').addEventListener('click',    openPromptsPanel);
+}
+
+// ─── Barre de recherche ─────────────────────────────────────────────────────────
+function bindSearchBox() {
+  const box   = document.getElementById('search-box');
+  const input = document.getElementById('search-input');
+  const clear = document.getElementById('search-clear');
+  if (!input || !box) return;
+
+  function applySearch(value) {
+    searchQuery = value;
+    box.classList.toggle('has-query', value.trim().length > 0);
+    // Rendu force : la recherche change l'affichage meme si les donnees sont identiques.
+    renderTasks(currentTasks, { force: true });
+  }
+
+  input.addEventListener('input', () => applySearch(input.value));
+  input.addEventListener('keydown', e => {
+    // Echap : vide d'abord la recherche si elle est active (avant les handlers globaux).
+    if (e.key === 'Escape' && input.value) {
+      e.stopPropagation();
+      input.value = '';
+      applySearch('');
+    }
+  });
+  clear.addEventListener('click', () => {
+    input.value = '';
+    applySearch('');
+    input.focus();
+  });
 }
 
 // ─── Refresh & rendu ──────────────────────────────────────────────────────────
@@ -277,15 +314,45 @@ function toggleAddBar() {
   else flushPendingRefresh();
 }
 
+// Decoupe la recherche en termes (espaces). Un terme purement numerique matche
+// l'id (egalite ou sous-chaine) ; tout terme matche aussi le texte (sujet,
+// contexte, note, repo, agent). Tous les termes doivent matcher (ET).
+function parseSearchTerms(query) {
+  return (query || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+}
+
+function taskMatchesSearch(task, terms) {
+  if (!terms.length) return true;
+  const haystack = [task.sujet, task.contexte, task.note, task.repo, task.agent]
+    .map(v => (v || '').toString().toLowerCase()).join('  ');
+  const idStr = String(task.id);
+  return terms.every(term => {
+    if (/^\d+$/.test(term) && (idStr === term || idStr.includes(term))) return true;
+    return haystack.includes(term);
+  });
+}
+
 function buildTasksHtml(tasks, opts) {
+  const terms = parseSearchTerms(searchQuery);
+  const searching = terms.length > 0;
+
   const visibleTasks = tasks.filter(tk => {
-    if (tk.statut === 'annule' && !opts.showAnnule) return false;
-    return true;
+    // En mode recherche, on cherche partout (y compris fait/annule) ; sinon on
+    // respecte la preference d'affichage des taches annulees.
+    if (!searching && tk.statut === 'annule' && !opts.showAnnule) return false;
+    return taskMatchesSearch(tk, terms);
   });
 
   if (!visibleTasks.length) {
+    if (searching) {
+      return `<div id="empty-state"><div class="icon">\u{1F50D}</div><div>${esc(t('search_no_results'))}</div></div>`;
+    }
     return `<div id="empty-state"><div class="icon">\u2705</div><div>${esc(t('empty_no_tasks'))}</div></div>`;
   }
+
+  // En mode recherche, on affiche systematiquement les taches "fait" trouvees
+  // (sinon chercher dans les taches cloturees n'aurait pas de sens).
+  if (searching) opts = Object.assign({}, opts, { showFait: true });
 
   const groupes = {};
   for (const tk of visibleTasks) {
@@ -316,7 +383,13 @@ function buildTasksHtml(tasks, opts) {
     return a.localeCompare(b);
   });
 
-  return repoKeys.map(r => renderRepoGroup(r, groupes[r], { showFait: opts.showFait, maxPerGrp: opts.maxPerGrp })).join('');
+  // En recherche : pas de troncature par groupe (on veut tous les resultats) et
+  // on force l'expansion des groupes/sections pour ne rien cacher.
+  return repoKeys.map(r => renderRepoGroup(r, groupes[r], {
+    showFait:  opts.showFait,
+    maxPerGrp: searching ? 0 : opts.maxPerGrp,
+    searching,
+  })).join('');
 }
 
 function renderTasks(tasks, opts = {}) {
@@ -330,6 +403,7 @@ function renderTasks(tasks, opts = {}) {
     showFait,
     showAnnule,
     maxPerGrp,
+    search: searchQuery,
     tasks,
   });
 
@@ -447,9 +521,11 @@ function executeScriptsIn(root) {
 }
 
 function renderRepoGroup(repo, agentsMap, opts) {
+  const searching = !!(opts && opts.searching);
   const nom  = (repo === '_hors_repo_') ? 'Hors repo' : repo;
   const b64  = btoa(unescape(encodeURIComponent(repo)));
-  const coll = collapsedRepos.has(repo);
+  // En recherche, on ne replie jamais le groupe (sinon un resultat serait cache).
+  const coll = !searching && collapsedRepos.has(repo);
 
   let total = 0, todo = 0, faites = [];
   const agentsActifs = {};
@@ -494,7 +570,7 @@ function renderRepoGroup(repo, agentsMap, opts) {
       const db = b.date_cloture || b.date_creation || '';
       return db.localeCompare(da);
     });
-    const fVis = visibleFaites.has(repo);
+    const fVis = searching || visibleFaites.has(repo);
     h += `<button class="btn-toggle-faites" onclick='toggleFaites(${j(repo)},${j(b64)})'>`;
     const doneLabel = faites.length > 1 ? t('repo_done_many') : t('repo_done_one');
     h += `${fVis ? '\u25BE' : '\u25B8'} \u2705 ${faites.length} ${esc(doneLabel)}`;
@@ -2065,13 +2141,6 @@ function j(s) { return JSON.stringify(s); }
 function formatDate(d) {
   if (!d || d.length < 12) return d || '';
   return `${d.slice(6,8)}/${d.slice(4,6)}/${d.slice(0,4)} ${d.slice(8,10)}:${d.slice(10,12)}`;
-}
-
-function truncatePath(p, max) {
-  if (!p || p.length <= max) return p;
-  const head = p.slice(0, Math.floor(max / 2) - 2);
-  const tail = p.slice(-Math.ceil(max / 2) + 2);
-  return head + '\u2026' + tail;
 }
 
 // ─── Expose pour les onclick inline generes dynamiquement ─────────────────────

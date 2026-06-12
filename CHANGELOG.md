@@ -7,6 +7,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 _(nothing yet)_
 
+## [1.8.0] - 2026-06-12
+
+### Added
+- **Search bar in the header** — a new search field next to the task counter filters the task list live, by **task number** or by **text**. A numeric term matches the task id (exact or substring, e.g. `28` finds `2806` and `128`); any term also matches the subject, context, note, repo and agent (case-insensitive). Multiple words are combined with AND. While searching, **done and cancelled tasks are included automatically** (the whole point is to find a closed task again), collapsed repo groups and the "completed tasks" sections expand on their own so nothing stays hidden, and the per-group display cap is lifted. When nothing matches, a dedicated "No task matches this search" message is shown. **Ctrl+F** (and Cmd+F) focuses the field and selects its content; **Escape** clears the search. Fully client-side — `get-tasks` already returns every task, so the backend (`agent.py`) and the HTTP API are untouched. Translated into the 9 bundled languages.
+
+### Changed
+- **Database path removed from the header** — it was redundant with the **Settings → Database** section (which already shows the full path plus "Open folder" / "Export" buttons), and the freed space makes room for the new search bar. The now-dead `truncatePath` helper and the `#db-path-display` styling were removed as well.
+
 ## [1.7.1] - 2026-06-11
 
 ### Fixed

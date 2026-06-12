@@ -127,14 +127,13 @@ html, body { background: var(--bg); color: var(--text); font-family: var(--font)
 /* Tous les éléments interactifs dans le header doivent désactiver le drag */
 #header button, #header select, #header input,
 #btn-refresh, #btn-add-toggle, #btn-theme, #btn-settings, #btn-guide,
-#task-count, #db-path-display, #refresh-dot {
+#task-count, #refresh-dot, #search-box {
   -webkit-app-region: no-drag;
 }
 
 #header h1 { font-size: 14px; font-weight: 600; color: var(--accent); }
 #header .spacer { flex: 1; }
 #task-count { font-size: 12px; color: var(--text-dim); }
-#db-path-display { font-size: 10px; color: var(--text-muted); font-family: monospace; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: help; }
 #btn-refresh {
   background: var(--bg-card); border: 1px solid var(--border);
   color: var(--text-dim); width: 30px; height: 30px;
@@ -151,6 +150,29 @@ html, body { background: var(--bg); color: var(--text); font-family: var(--font)
 #btn-add-toggle:hover { opacity: .85; }
 #refresh-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); transition: background .2s; }
 #refresh-dot.active { background: var(--accent); }
+
+/* ─── Barre de recherche (header) ─────────────────────────────────────────────── */
+#search-box {
+  display: flex; align-items: center; gap: 4px;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 16px; padding: 2px 6px 2px 9px;
+  transition: border-color .2s;
+}
+#search-box:focus-within { border-color: var(--accent); }
+#search-icon { font-size: 11px; color: var(--text-muted); flex-shrink: 0; }
+#search-input {
+  background: transparent; border: none; outline: none;
+  color: var(--text); font-size: 12px;
+  padding: 4px 2px; width: 190px; max-width: 32vw;
+}
+#search-input::placeholder { color: var(--text-muted); }
+#search-clear {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-muted); font-size: 16px; line-height: 1;
+  padding: 0 2px; display: none; flex-shrink: 0;
+}
+#search-clear:hover { color: var(--danger); }
+#search-box.has-query #search-clear { display: block; }
 
 /* ─── Corps ──────────────────────────────────────────────────────────────────── */
 #main { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
