@@ -531,8 +531,35 @@ app.commandLine.appendSwitch('enable-smooth-scrolling');
 app.commandLine.appendSwitch('enable-gpu-rasterization');
 app.commandLine.appendSwitch('enable-zero-copy');
 
+// ─── Verrou d'instance unique ─────────────────────────────────────────────────
+// Empeche deux instances de la meme installation de tourner en parallele (ex:
+// double-clic sur l'app deja ouverte). Sans ce verrou, la 2e instance demarrerait
+// un 2e serveur HTTP sur le port 17891 et un 2e watcher sur la meme tasks.db. On
+// refuse la 2e instance et on ramene la fenetre existante au premier plan.
+// NB : le verrou Electron est lie au chemin userData, donc il ne couvre PAS le cas
+// "build dev (userData=dossier projet) en parallele de l'app installee
+// (userData=AppData)". Pour ce cas, startHttpApi() teste d'abord si le port repond
+// deja a /health avant de demarrer son serveur (cf. http-api.js).
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
+
 // ─── App lifecycle ────────────────────────────────────────────────────────────
 app.whenReady().then(() => {
+  // Si une autre instance detient deja le verrou, ne rien initialiser : on a
+  // appele app.quit() ci-dessus, mais whenReady peut se resoudre avant le quit
+  // effectif. Sans ce garde, on demarrerait quand meme un 2e serveur HTTP.
+  if (!gotTheLock) return;
+
   // Dev : detecter Python. Prod : pas de Python requis, on a agent.exe autonome.
   if (!IS_PACKAGED) {
     PYTHON_CMD = detectPython();

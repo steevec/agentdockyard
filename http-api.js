@@ -140,6 +140,33 @@ function agentCallSucceeded(result) {
   return true;
 }
 
+// Verifie si un AgentDockyard repond deja sur host:port via /health. Sur Windows,
+// deux process du meme utilisateur peuvent bind 127.0.0.1:port simultanement sans
+// EADDRINUSE : Windows repartit alors les connexions entrantes entre les deux
+// serveurs de facon non deterministe. Le verrou d'instance unique d'Electron ne
+// couvre pas le cas "build dev + app installee" (userData differents), donc on
+// sonde le port avant de demarrer pour ne pas dedoubler le service.
+function probeHealth(host, port, timeoutMs) {
+  return new Promise((resolve) => {
+    const req = http.request(
+      { host, port, path: '/health', method: 'GET', timeout: timeoutMs },
+      (res) => {
+        let body = '';
+        res.on('data', (d) => { body += d; });
+        res.on('end', () => {
+          try {
+            const j = JSON.parse(body || '{}');
+            resolve(j && j.service === 'AgentDockyard HTTP API');
+          } catch (_) { resolve(false); }
+        });
+      }
+    );
+    req.on('error', () => resolve(false));   // personne n'ecoute -> port libre
+    req.on('timeout', () => { req.destroy(); resolve(false); });
+    req.end();
+  });
+}
+
 function startHttpApi(options) {
   const cfg = options.config && options.config.httpApi ? options.config.httpApi : {};
   if (!cfg.enabled) {
@@ -202,8 +229,17 @@ function startHttpApi(options) {
     console.error(`[http-api] listen failed on ${host}:${port}:`, err && err.message);
   });
 
-  server.listen(port, host, () => {
-    console.log(`[http-api] listening on http://${host}:${port}`);
+  // Ne demarrer que si aucun autre AgentDockyard ne tient deja le port (cf.
+  // probeHealth). Sinon on laisse l'instance existante seule maitre du port pour
+  // eviter que des appels d'agents tombent sur la mauvaise base.
+  probeHealth(host, port, 1500).then((alreadyRunning) => {
+    if (alreadyRunning) {
+      console.warn(`[http-api] un AgentDockyard repond deja sur ${host}:${port} — serveur HTTP non demarre pour cette instance`);
+      return;
+    }
+    server.listen(port, host, () => {
+      console.log(`[http-api] listening on http://${host}:${port}`);
+    });
   });
 
   return server;

@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 _(nothing yet)_
 
+## [1.8.1] - 2026-06-12
+
+### Fixed
+- **Two instances could both serve the local HTTP API on port 17891** — there was no single-instance lock, so launching a second instance (typically a dev build while the installed app is running) started a second HTTP server. On Windows, two processes owned by the same user can bind `127.0.0.1:17891` at the same time without `EADDRINUSE`, and Windows then spreads incoming agent calls between both servers non-deterministically — meaning an agent request could hit the wrong instance and read/write (or auto-purge) the wrong `tasks.db`. Two complementary guards now prevent this: (1) `app.requestSingleInstanceLock()` makes a second instance of the **same install** quit immediately and refocus the existing window; (2) since the Electron lock is keyed on the `userData` path and therefore doesn't cover the dev-build-vs-installed-app case, `startHttpApi()` now probes `/health` before binding and skips starting its own server if another AgentDockyard already answers on the port.
+
 ## [1.8.0] - 2026-06-12
 
 ### Added
