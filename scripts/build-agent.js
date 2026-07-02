@@ -73,9 +73,13 @@ function main() {
   log('Nettoyage dist-agent/ effectue');
 
   log('Compilation de agent.py -> agent.exe ...');
+  // --onedir (et non --onefile) : en onefile, CHAQUE invocation extrait tout le
+  // runtime Python dans %TEMP% avant de s executer (~300-800 ms de CPU/disque/
+  // antivirus par appel). Or l agent est spawne a chaque refresh UI et a chaque
+  // appel API des agents IA. En onedir, le demarrage est quasi instantane.
   const r = spawnSync(python, [
     '-m', 'PyInstaller',
-    '--onefile',
+    '--onedir',
     '--clean',                  // ignore les caches PyInstaller (build reproductible)
     '--noupx',                  // pas de compression UPX (souvent flaggee par les antivirus)
     '--name', 'agent',
@@ -88,13 +92,17 @@ function main() {
 
   if (r.status !== 0) fail(`PyInstaller a echoue (code ${r.status})`);
 
-  // Verifier la sortie selon l'OS
+  // Verifier la sortie selon l'OS (layout onedir : dist-agent/agent/agent.exe + _internal/)
   const outName = process.platform === 'win32' ? 'agent.exe' : 'agent';
-  const outPath = path.join(DIST_AGENT, outName);
+  const outDir  = path.join(DIST_AGENT, 'agent');
+  const outPath = path.join(outDir, outName);
   if (!fs.existsSync(outPath)) fail(`Executable attendu introuvable : ${outPath}`);
 
-  const size = fs.statSync(outPath).size;
-  log(`OK - ${outName} genere : ${outPath} (${(size / 1024 / 1024).toFixed(1)} MB)`);
+  const dirSize = (p) => fs.readdirSync(p, { withFileTypes: true }).reduce((acc, e) => {
+    const full = path.join(p, e.name);
+    return acc + (e.isDirectory() ? dirSize(full) : fs.statSync(full).size);
+  }, 0);
+  log(`OK - dossier agent/ genere : ${outDir} (${(dirSize(outDir) / 1024 / 1024).toFixed(1)} MB au total)`);
 
   // Nettoyer les artefacts temporaires (laisse dist-agent/agent.exe)
   try { fs.rmSync(BUILD_TMP, { recursive: true, force: true }); } catch (_) {}

@@ -57,8 +57,10 @@ function agentExecutableName() {
   return 'agent';
 }
 
+// Layout onedir : resources/agent/agent.exe (+ _internal/), demarrage quasi
+// instantane contrairement au onefile qui s auto-extrait a chaque appel.
 const AGENT_EXE_PATH = IS_PACKAGED
-  ? path.join(process.resourcesPath, agentExecutableName())
+  ? path.join(process.resourcesPath, 'agent', agentExecutableName())
   : null; // dev -> pas d'exe, on utilise python + agent.py
 
 const AGENT_SCRIPT_DEV = path.join(__dirname, 'agent.py');
