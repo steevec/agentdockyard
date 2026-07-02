@@ -48,6 +48,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 # DB_PATH : argv[2] si fourni (mode Electron prod, DB dans userData), sinon DB locale.
 DB_PATH    = sys.argv[2] if len(sys.argv) > 2 else os.path.join(SCRIPT_DIR, 'tasks.db')
 JSON_PATH  = os.path.join(os.path.dirname(DB_PATH), 'tasks.json')
+CONFIG_PATH = os.path.join(os.path.dirname(DB_PATH), 'config.json')
 
 STATUTS_VALIDES = {'en_cours', 'fait', 'annule', 'bloque', 'en_attente', 'a_faire_rapidement'}
 
@@ -75,13 +76,65 @@ def row_to_dict(row):
     return dict(zip(COLUMNS, row))
 
 
+# ─── Config applicative (config.json de l'app Electron, a cote de tasks.db) ──
+# L'app ecrit ses reglages (delais de purge, expiration des reclamations) dans
+# config.json, dans le meme dossier que tasks.db. L'agent les lit ici pour que
+# le panneau Parametres soit reellement applique, y compris en appel CLI direct.
+# Tolerant : fichier absent ou corrompu -> valeurs par defaut historiques.
+PURGE_DELAI_JOURS_DEFAUT   = 90
+RECLAM_EXPIRATION_H_DEFAUT = 24
+
+
+def _load_app_config():
+    try:
+        with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+            cfg = json.load(f)
+        return cfg if isinstance(cfg, dict) else {}
+    except Exception:
+        return {}
+
+
+APP_CONFIG = _load_app_config()
+
+
+def _int_positif(val, defaut):
+    try:
+        n = int(val)
+        return n if n > 0 else defaut
+    except (TypeError, ValueError):
+        return defaut
+
+
+def _purge_config():
+    cfg = APP_CONFIG.get('purge')
+    if not isinstance(cfg, dict):
+        cfg = {}
+    return {
+        'enabled':            bool(cfg.get('enabled', True)),
+        'delai_fait_jours':   _int_positif(cfg.get('delai_fait_jours'),   PURGE_DELAI_JOURS_DEFAUT),
+        'delai_annule_jours': _int_positif(cfg.get('delai_annule_jours'), PURGE_DELAI_JOURS_DEFAUT),
+    }
+
+
+def _reclamation_expiration_secondes():
+    cfg = APP_CONFIG.get('reclamation')
+    if not isinstance(cfg, dict):
+        cfg = {}
+    return _int_positif(cfg.get('expiration_heures'), RECLAM_EXPIRATION_H_DEFAUT) * 3600
+
+
 # ─── Connexion SQLite ──────────────────────────────────────────────────────────
 _VIRTIO_TMP = None  # chemin /tmp utilise en mode fallback VirtioFS (None si direct)
 
 
 def _open_sqlite(path, timeout=15):
     conn = sqlite3.connect(path, timeout=timeout)
-    conn.execute('PRAGMA journal_mode=OFF')
+    # DELETE (et non OFF) : avec journal_mode=OFF, un crash en pleine ecriture
+    # peut corrompre tasks.db de facon irrecuperable. DELETE garde un rollback
+    # journal transitoire a cote du fichier et rend chaque transaction atomique.
+    # (WAL est volontairement ecarte : les snapshots horaires copient tasks.db
+    # seul, un -wal non checkpointe leur ferait perdre les dernieres ecritures.)
+    conn.execute('PRAGMA journal_mode=DELETE')
     conn.execute('PRAGMA synchronous=NORMAL')
     conn.execute('PRAGMA busy_timeout=10000')
     conn.row_factory = sqlite3.Row
@@ -208,20 +261,31 @@ def migrate_from_json(conn):
         print(f"[migration] echec (non bloquant) : {e}", file=sys.stderr)
 
 
-# ─── Purge automatique (appelee uniquement a l'ajout) ─────────────────────────
+# ─── Purge automatique (appelee a l'ajout et via purger_auto) ─────────────────
 def purge_old(conn):
-    """Supprime les taches fait/annule cloturees depuis plus de 90 jours."""
-    limit = date_minus(90 * 24 * 3600)
-    cur = conn.execute(
-        "DELETE FROM tasks WHERE statut IN ('fait','annule') AND date_cloture != '' AND date_cloture < ?",
-        (limit,)
-    )
-    if cur.rowcount:
-        print(f"[purge] {cur.rowcount} tache(s) de plus de 90 jours supprimee(s)", file=sys.stderr)
+    """Supprime les taches fait/annule dont le delai de purge est depasse.
+
+    Honore les reglages du panneau Parametres (config.json) : purge desactivable,
+    delais distincts pour 'fait' et 'annule'. Retourne le nombre supprime.
+    """
+    cfg = _purge_config()
+    if not cfg['enabled']:
+        return 0
+    deleted = 0
+    for statut, delai_jours in (('fait', cfg['delai_fait_jours']), ('annule', cfg['delai_annule_jours'])):
+        limit = date_minus(delai_jours * 24 * 3600)
+        cur = conn.execute(
+            "DELETE FROM tasks WHERE statut=? AND date_cloture != '' AND date_cloture < ?",
+            (statut, limit)
+        )
+        deleted += cur.rowcount
+    if deleted:
+        print(f"[purge] {deleted} tache(s) expiree(s) supprimee(s)", file=sys.stderr)
+    return deleted
 
 def liberer_reclamations_expirees(conn):
-    """Libere les reclamations de plus de 24h."""
-    limit = date_minus(86400)
+    """Libere les reclamations expirees (delai configurable, 24h par defaut)."""
+    limit = date_minus(_reclamation_expiration_secondes())
     conn.execute(
         "UPDATE tasks SET reclame_par='', date_reclamation='' WHERE reclame_par != '' AND date_reclamation < ?",
         (limit,)
@@ -444,6 +508,19 @@ def ws_purger_maintenant(data_in, conn):
     return ok(f"{deleted} tache(s) purgee(s)", {'deleted': deleted})
 
 
+def ws_purger_auto(data_in, conn):
+    """Purge uniquement les taches dont le delai configure est depasse.
+
+    Utilisee par l'option 'Purger aussi au demarrage' : contrairement a
+    purger_maintenant qui vide toutes les archives, cette action respecte
+    les delais du panneau Parametres.
+    """
+    with conn:
+        deleted = purge_old(conn)
+        liberer_reclamations_expirees(conn)
+    return ok(f"{deleted} tache(s) purgee(s)", {'deleted': deleted})
+
+
 def ws_exporter_json(data_in, conn):
     """Retourne toutes les taches pour export JSON externe."""
     tasks = _fetch_tasks(conn)
@@ -466,6 +543,7 @@ ACTIONS = {
     'recuperer':         ws_recuperer,
     'compter':           ws_compter,
     'purger_maintenant': ws_purger_maintenant,
+    'purger_auto':       ws_purger_auto,
     'exporter_json':     ws_exporter_json,
 }
 

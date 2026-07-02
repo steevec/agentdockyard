@@ -5,7 +5,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-_(nothing yet)_
+### Fixed
+- **"Export JSON" button never worked** — the IPC handler called `callAgent()` without `await`, so it always saw a pending Promise instead of the agent response and systematically reported "Echec export". The handler is now async and awaits the agent; the export file is actually written to the data folder.
+- **Purge and claim-expiry settings were ignored** — `agent.py` hardcoded the auto-purge to 90 days and the claim auto-release to 24 h, so the Settings fields "Purge done/cancelled tasks after (days)", the "Enable auto-purge" toggle and "Auto-release claims after (hours)" had no effect at all. The agent now reads `config.json` (written by the app next to `tasks.db`) and honours those settings, with separate delays for done and cancelled tasks, including when invoked directly by CLI agents. Missing or corrupt config falls back to the historical 90 d / 24 h defaults.
+- **"Purge on startup too" deleted ALL closed tasks** — the startup purge reused the `purger_maintenant` action, which empties every done/cancelled task regardless of age (that behaviour belongs to the explicit "Purge now" button and its confirmation dialog). Startup now calls a new `purger_auto` action that only removes tasks whose configured retention delay has expired.
+- **Repo names containing an apostrophe broke the UI** — `esc()` did not escape single quotes while collapse/expand handlers are generated inside single-quoted `onclick` attributes, so a repo like `L'appli` produced broken HTML (group impossible to fold, and an HTML-injection vector for task data coming from the network API). `esc()` now escapes `'` and the repo-based handlers are escaped accordingly.
+- **Multi-byte UTF-8 characters could be corrupted in transit** — the agent stdout/stderr pipes (Electron UI and HTTP API) and the HTTP request body were accumulated string-by-chunk; a multi-byte character (accent, emoji, `→`) split across two chunks was turned into replacement characters. Streams now use `setEncoding('utf8')` and the HTTP body is accumulated as Buffers and decoded once.
+- **DB watcher never started on a fresh install** — when `tasks.db` did not exist yet at launch (it is created by the first agent call), `fs.watch` was skipped forever, so external agent writes did not refresh the UI until the app was restarted. The watcher now retries every 5 s until the database file exists.
+
+### Changed
+- **SQLite journal mode switched from OFF to DELETE** — with `journal_mode=OFF` an interrupted write (crash, kill, power loss) could corrupt `tasks.db` beyond repair since there is no rollback journal. DELETE restores atomic transactions with no visible cost at this scale. WAL was deliberately not chosen: hourly snapshots copy the single `tasks.db` file, and a non-checkpointed `-wal` would silently lose the latest writes in snapshots.
 
 ## [1.8.1] - 2026-06-12
 

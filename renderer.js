@@ -544,7 +544,7 @@ function renderRepoGroup(repo, agentsMap, opts) {
   const todoLabel = todo > 1 ? t('repo_todo_many') : t('repo_todo_one');
 
   let h = `<div class="groupe-repo${coll ? ' collapsed' : ''}" id="repo-${b64}">`;
-  h += `<div class="groupe-repo-titre" onclick='toggleRepo(${j(repo)},${j(b64)})'>`;
+  h += `<div class="groupe-repo-titre" onclick='toggleRepo(${esc(j(repo))},${j(b64)})'>`;
   h += `<span class="repo-fleche">\u25BE</span>`;
   h += `<span class="repo-icone">${repo === 'Cowork' ? '\u2699\uFE0F' : '\u{1F4C1}'}</span>`;
   h += `<span class="repo-nom">${esc(nom)} <span class="repo-todo">(${todo} ${esc(todoLabel)})</span></span>`;
@@ -571,7 +571,7 @@ function renderRepoGroup(repo, agentsMap, opts) {
       return db.localeCompare(da);
     });
     const fVis = searching || visibleFaites.has(repo);
-    h += `<button class="btn-toggle-faites" onclick='toggleFaites(${j(repo)},${j(b64)})'>`;
+    h += `<button class="btn-toggle-faites" onclick='toggleFaites(${esc(j(repo))},${j(b64)})'>`;
     const doneLabel = faites.length > 1 ? t('repo_done_many') : t('repo_done_one');
     h += `${fVis ? '\u25BE' : '\u25B8'} \u2705 ${faites.length} ${esc(doneLabel)}`;
     h += `</button>`;
@@ -2133,7 +2133,10 @@ function showToast(msg, type='success') {
 
 function esc(s) {
   if (s === null || s === undefined) return '';
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  // L'apostrophe doit aussi etre echappee : certains attributs generes sont
+  // delimites par des quotes simples (onclick='...'), un repo contenant une
+  // apostrophe casserait l'attribut (et ouvrirait une injection HTML).
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 function j(s) { return JSON.stringify(s); }

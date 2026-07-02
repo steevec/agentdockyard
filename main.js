@@ -212,6 +212,10 @@ function callAgent(payload, dbPathOverride) {
       if (!done) { done = true; try { child.kill(); } catch (_) {} resolve({ statut: 'NOK', message: 'Timeout' }); }
     }, 10000);
 
+    // setEncoding : sans lui, chaque chunk Buffer est converti isolement et un
+    // caractere UTF-8 multi-octets a cheval sur deux chunks serait corrompu.
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
     child.stdout.on('data', d => { stdout += d; });
     child.stderr.on('data', d => { stderr += d; });
     child.on('close', (code) => {
@@ -507,18 +511,30 @@ function createWindow() {
   if (cfg.window && cfg.window.autoRemember) setupAutoRemember(mainWindow);
 
   function startWatcher() {
-    if (!fs.existsSync(DB_PATH)) return;
-    dbWatcher = fs.watch(DB_PATH, () => {
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => {
-        if (Date.now() - lastOwnWrite < 600) return;
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('db-changed');
-        }
-      }, 400);
-    });
+    if (dbWatcher || !fs.existsSync(DB_PATH)) return;
+    try {
+      dbWatcher = fs.watch(DB_PATH, () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          if (Date.now() - lastOwnWrite < 600) return;
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('db-changed');
+          }
+        }, 400);
+      });
+    } catch (e) { console.error('[watcher] demarrage echoue :', e.message); }
   }
   startWatcher();
+  // Premiere installation : tasks.db n'existe pas encore (creee au premier appel
+  // agent). Sans retry, les ecritures des agents externes ne rafraichiraient
+  // jamais l'UI jusqu'au redemarrage de l'app.
+  if (!dbWatcher) {
+    const watcherRetry = setInterval(() => {
+      startWatcher();
+      if (dbWatcher) clearInterval(watcherRetry);
+    }, 5000);
+    mainWindow.on('closed', () => clearInterval(watcherRetry));
+  }
 
   mainWindow.on('closed', () => {
     if (dbWatcher) { dbWatcher.close(); dbWatcher = null; }
@@ -592,7 +608,9 @@ app.whenReady().then(() => {
   try {
     const cfg = loadConfig();
     if (cfg.purge && cfg.purge.au_demarrage && cfg.purge.enabled) {
-      callAgent({ action: 'purger_maintenant' });
+      // purger_auto respecte les delais configures ; purger_maintenant (bouton
+      // du panneau Parametres) viderait TOUTES les archives, meme recentes.
+      callAgent({ action: 'purger_auto' });
     }
     httpApiServer = startHttpApi({
       config: cfg,
@@ -713,8 +731,8 @@ ipcMain.handle('purge-now', async () => {
   return r;
 });
 
-ipcMain.handle('export-json', () => {
-  const r = callAgent({ action: 'exporter_json' });
+ipcMain.handle('export-json', async () => {
+  const r = await callAgent({ action: 'exporter_json' });
   if (r && r.statut === 'OK' && Array.isArray(r.taches)) {
     const stamp    = new Date().toISOString().replace(/[:.]/g, '-');
     const filename = `agentdockyard-export-${stamp}.json`;

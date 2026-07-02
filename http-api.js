@@ -23,7 +23,9 @@ function jsonResponse(res, statusCode, data) {
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
     let size = 0;
-    let body = '';
+    // Accumuler des Buffers puis concatener : convertir chunk par chunk en
+    // string corromprait un caractere UTF-8 multi-octets coupe entre 2 chunks.
+    const chunks = [];
     let settled = false;
 
     req.on('data', (chunk) => {
@@ -31,19 +33,19 @@ function readJsonBody(req) {
       size += chunk.length;
       if (size > MAX_BODY_BYTES) {
         settled = true;
-        body = '';
+        chunks.length = 0;
         req.resume();
         reject(Object.assign(new Error('Body too large'), { statusCode: 413 }));
         return;
       }
-      body += chunk;
+      chunks.push(chunk);
     });
 
     req.on('end', () => {
       if (settled) return;
       settled = true;
       try {
-        resolve(JSON.parse(body || '{}'));
+        resolve(JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'));
       } catch (err) {
         reject(Object.assign(new Error('Invalid JSON'), { statusCode: 400 }));
       }
@@ -107,6 +109,10 @@ function callAgentRaw(payload, options) {
       resolve({ stdout, stderr: stderr || 'Timeout', exitCode: 1 });
     }, AGENT_TIMEOUT_MS);
 
+    // setEncoding : evite de corrompre un caractere UTF-8 multi-octets coupe
+    // entre deux chunks du pipe stdout/stderr.
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
     child.stdout.on('data', d => { stdout += d; });
     child.stderr.on('data', d => { stderr += d; });
     child.on('close', (code) => {
