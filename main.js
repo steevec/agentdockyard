@@ -298,12 +298,17 @@ function listSnapshotFiles() {
   return out;
 }
 
-function takeSnapshot(suffix) {
+async function takeSnapshot(suffix) {
   if (!fs.existsSync(DB_PATH)) return null;
   ensureSnapshotsDir();
   const stamp = snapshotStamp(new Date());
   const name  = `snapshot-${stamp}${suffix ? '-' + suffix : ''}.db`;
   const dest  = path.join(SNAPSHOTS_DIR, name);
+  // VACUUM INTO via l'agent : copie coherente meme si une ecriture est en
+  // cours, la ou une copie de fichier brute pouvait capturer un etat torn.
+  const r = await callAgent({ action: 'sauvegarder', destination: dest });
+  if (r && r.statut === 'OK') return name;
+  // Fallback (agent indisponible, ex: dev sans Python) : copie brute historique
   try {
     fs.copyFileSync(DB_PATH, dest);
     return name;
@@ -330,27 +335,27 @@ function rotateSnapshots() {
   }
 }
 
-function maybeTakeHourlySnapshot() {
+async function maybeTakeHourlySnapshot() {
   const list = listSnapshotFiles().filter(s => !s.beforeRestore);
   const last = list[0];  // plus recent
   if (!last || (Date.now() - last.timestamp) >= SNAPSHOT_INTERVAL_MS) {
-    takeSnapshot();
+    await takeSnapshot();
   }
   rotateSnapshots();
 }
 
 function startSnapshotScheduler() {
   // 1) Snapshot "initial" si aucune sauvegarde recente
-  try { maybeTakeHourlySnapshot(); } catch (e) { console.error('[snapshot] init :', e.message); }
+  maybeTakeHourlySnapshot().catch(e => console.error('[snapshot] init :', e.message));
 
   // 2) Aligner le prochain tick sur l'heure pile suivante (HH:00:00), puis interval 1h
   const now      = new Date();
   const msToNext = (60 - now.getMinutes()) * 60 * 1000 - now.getSeconds() * 1000 - now.getMilliseconds();
 
   setTimeout(() => {
-    try { maybeTakeHourlySnapshot(); } catch (e) { console.error('[snapshot] tick :', e.message); }
+    maybeTakeHourlySnapshot().catch(e => console.error('[snapshot] tick :', e.message));
     snapshotTimer = setInterval(() => {
-      try { maybeTakeHourlySnapshot(); } catch (e) { console.error('[snapshot] tick :', e.message); }
+      maybeTakeHourlySnapshot().catch(e => console.error('[snapshot] tick :', e.message));
     }, SNAPSHOT_INTERVAL_MS);
   }, Math.max(1000, msToNext));
 }
@@ -377,7 +382,7 @@ async function previewSnapshotTasks(filename) {
   return { ok: false, error: (r && r.message) || 'Lecture du snapshot echouee' };
 }
 
-function restoreSnapshotFile(filename) {
+async function restoreSnapshotFile(filename) {
   const meta = parseSnapshotName(filename);
   if (!meta) return { ok: false, error: 'Nom de snapshot invalide' };
   const src = path.join(SNAPSHOTS_DIR, filename);
@@ -386,8 +391,11 @@ function restoreSnapshotFile(filename) {
   try { srcSize = fs.statSync(src).size; } catch (_) { /* ignore */ }
   if (!srcSize) return { ok: false, error: 'Snapshot vide ou illisible' };
   // Securite : snapshot de l'etat courant AVANT d'ecraser
-  const backupName = takeSnapshot('before-restore');
+  const backupName = await takeSnapshot('before-restore');
   try {
+    // Un rollback-journal residuel d'un crash annulerait des pages de la base
+    // fraichement restauree : on remplace la base entiere, il doit disparaitre.
+    try { fs.unlinkSync(DB_PATH + '-journal'); } catch (_) { /* absent = normal */ }
     fs.copyFileSync(src, DB_PATH);
     lastOwnWrite = Date.now();
     return { ok: true, backup: backupName };
@@ -808,21 +816,29 @@ ipcMain.handle('fetch-widget-url', async (event, url, timeoutSeconds) => {
   if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) {
     return { ok: false, error: 'URL invalide (http(s) requis)' };
   }
-  let parsed;
-  try { parsed = new URL(url); } catch (e) { return { ok: false, error: 'URL malformee' }; }
-  const lib = parsed.protocol === 'https:' ? https : http;
-  const MAX_BYTES    = 256 * 1024;
+  const MAX_BYTES     = 256 * 1024;
+  const MAX_REDIRECTS = 3;
   const t = parseInt(timeoutSeconds, 10);
-  const TIMEOUT_MS   = (Number.isFinite(t) && t > 0) ? Math.max(2, Math.min(60, t)) * 1000 : 15000;
+  const TIMEOUT_MS    = (Number.isFinite(t) && t > 0) ? Math.max(2, Math.min(60, t)) * 1000 : 15000;
 
-  return new Promise((resolve) => {
+  const fetchOnce = (target, redirectsLeft) => new Promise((resolve) => {
+    let parsed;
+    try { parsed = new URL(target); } catch (e) { return resolve({ ok: false, error: 'URL malformee' }); }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return resolve({ ok: false, error: 'Protocole non supporte' });
+    }
+    const lib = parsed.protocol === 'https:' ? https : http;
     let done = false;
     const finish = (r) => { if (done) return; done = true; resolve(r); };
 
-    const req = lib.get(url, { timeout: TIMEOUT_MS, headers: { 'User-Agent': 'AgentDockyard-Widget/1.0' } }, (res) => {
+    const req = lib.get(target, { timeout: TIMEOUT_MS, headers: { 'User-Agent': 'AgentDockyard-Widget/1.0' } }, (res) => {
       if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         res.resume();
-        finish({ ok: false, error: `Redirection ${res.statusCode} (non suivie)` });
+        if (redirectsLeft <= 0) { finish({ ok: false, error: 'Trop de redirections' }); return; }
+        let next;
+        try { next = new URL(res.headers.location, target).toString(); }
+        catch (e) { finish({ ok: false, error: 'Redirection invalide' }); return; }
+        finish(fetchOnce(next, redirectsLeft - 1));
         return;
       }
       if (res.statusCode && res.statusCode >= 400) {
@@ -850,6 +866,8 @@ ipcMain.handle('fetch-widget-url', async (event, url, timeoutSeconds) => {
     req.on('timeout', () => { req.destroy(); finish({ ok: false, error: 'Timeout' }); });
     req.on('error', (e) => finish({ ok: false, error: e.message }));
   });
+
+  return fetchOnce(url, MAX_REDIRECTS);
 });
 
 ipcMain.handle('check-for-updates', async () => {
@@ -909,7 +927,7 @@ ipcMain.handle('snapshot-preview', async (event, filename) => {
 });
 
 ipcMain.handle('snapshot-restore', async (event, filename) => {
-  const r = restoreSnapshotFile(filename);
+  const r = await restoreSnapshotFile(filename);
   if (r.ok && mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('db-changed');
   }

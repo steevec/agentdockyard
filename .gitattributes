@@ -1,0 +1,19 @@
+# Force LF pour tous les fichiers texte (norme globale tous projets Sitecrea)
+* text=auto eol=lf
+
+# Fichiers binaires (pas de conversion)
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.otf binary
+*.swf binary
+*.zip binary
+*.pdf binary
+*.exe binary
+*.db binary

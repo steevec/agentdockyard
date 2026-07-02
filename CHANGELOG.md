@@ -5,6 +5,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+- **HTTP API section in Settings** — enable/disable the local HTTP API, change the listen host and port, and set an access token directly from the Settings panel, with a one-click **token generator** (24 random bytes, hex). Changes are applied immediately on save: the HTTP server is restarted on the fly with the new configuration, no app restart needed. Previously this required editing `config.json` by hand and relaunching. Translated into the 9 bundled languages.
+- **Checklist progress bars on task cards** — when a task note contains a `- [ ]` / `- [x]` checklist (the recommended `ETAT D AVANCEMENT` format for AI agents), the card now shows a slim progress bar with a `done/total` counter, turning green when everything is checked. Progress is visible at a glance without opening the note.
+- **Relative dates on task cards** — creation and closing dates now display as localized relative times ("il y a 2 heures", "hier", "2 時間前") via `Intl.RelativeTimeFormat`, with the exact absolute date in a tooltip. Events older than 7 days keep the absolute date. Labels age automatically with each refresh.
+- **Stacked toasts** — each notification now gets its own toast; several rapid actions no longer overwrite each other's feedback (up to 4 visible at once).
+- **Styled confirmation dialog** — all destructive actions (delete task, purge, delete prompt/folder, restore snapshot) now use an in-app themed modal instead of the native blocking `confirm()`. Escape or clicking the backdrop cancels; the confirm button has keyboard focus.
+- **Search term highlighting** — while searching, matched terms are highlighted in card subjects, contexts and notes with a `<mark>` accent.
+- **Widget URLs follow redirects** — URL widgets now follow up to 3 HTTP redirects (including relative `Location` headers) instead of failing with "Redirection (non suivie)".
+
+### Changed
+- **`agent.exe` is now built with PyInstaller `--onedir`** — in `--onefile` mode, every single invocation self-extracted the whole Python runtime into `%TEMP%` before running (~300-800 ms of CPU/disk/antivirus per call), and the agent is spawned on every UI refresh and every HTTP API call. The onedir layout (`resources/agent/agent.exe` + `_internal/`) starts almost instantly (~140 ms per call measured, actual work included).
+- **Electron upgraded 29 → 43** (with electron-builder 26 and electron-updater 6.8) — Electron 29 had been end-of-life for a long time, meaning no more Chromium security fixes while the renderer can execute remote HTML/JS through `allow_html` widgets. Also fixes the moderate js-yaml advisory via `npm audit fix`.
+- **Hourly snapshots now use SQLite `VACUUM INTO`** (through a new internal `sauvegarder` agent action) instead of a raw file copy — the backup is guaranteed consistent even if a write is in flight, and gets compacted for free. Raw copy remains as a fallback when the agent is unavailable.
+- **Strict `.gitattributes`** (`* text=auto eol=lf`) added to enforce the repo-wide LF policy.
+
 ### Fixed
 - **"Export JSON" button never worked** — the IPC handler called `callAgent()` without `await`, so it always saw a pending Promise instead of the agent response and systematically reported "Echec export". The handler is now async and awaits the agent; the export file is actually written to the data folder.
 - **Purge and claim-expiry settings were ignored** — `agent.py` hardcoded the auto-purge to 90 days and the claim auto-release to 24 h, so the Settings fields "Purge done/cancelled tasks after (days)", the "Enable auto-purge" toggle and "Auto-release claims after (hours)" had no effect at all. The agent now reads `config.json` (written by the app next to `tasks.db`) and honours those settings, with separate delays for done and cancelled tasks, including when invoked directly by CLI agents. Missing or corrupt config falls back to the historical 90 d / 24 h defaults.

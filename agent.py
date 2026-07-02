@@ -508,6 +508,25 @@ def ws_purger_maintenant(data_in, conn):
     return ok(f"{deleted} tache(s) purgee(s)", {'deleted': deleted})
 
 
+def ws_sauvegarder(data_in, conn):
+    """Copie coherente de la base vers 'destination' (VACUUM INTO).
+
+    Utilisee par les snapshots horaires de l'app Electron : contrairement a une
+    copie de fichier, VACUUM INTO produit une base complete et coherente meme
+    si une transaction est en cours au meme moment (et la compacte au passage).
+    """
+    dest = (data_in.get('destination') or '').strip()
+    if not dest:
+        return nok("Champ 'destination' obligatoire")
+    dest_dir = os.path.dirname(dest)
+    if dest_dir and not os.path.isdir(dest_dir):
+        return nok('Dossier destination introuvable')
+    if os.path.exists(dest):
+        return nok('Destination existe deja')
+    conn.execute('VACUUM INTO ?', (dest,))
+    return ok('Sauvegarde ecrite', {'destination': dest})
+
+
 def ws_purger_auto(data_in, conn):
     """Purge uniquement les taches dont le delai configure est depasse.
 
@@ -544,6 +563,7 @@ ACTIONS = {
     'compter':           ws_compter,
     'purger_maintenant': ws_purger_maintenant,
     'purger_auto':       ws_purger_auto,
+    'sauvegarder':       ws_sauvegarder,
     'exporter_json':     ws_exporter_json,
 }
 
