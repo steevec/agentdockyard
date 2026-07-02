@@ -189,6 +189,27 @@
       </div>
 
       <div class="settings-section">
+        <h3 data-i18n="settings_httpapi">API HTTP locale</h3>
+        <p class="hint" data-i18n="settings_httpapi_hint">Pont HTTP pour les agents (Cowork, sandbox, reseau local). 127.0.0.1 = ce PC uniquement ; 0.0.0.0 = accessible depuis le reseau (autoriser le port dans le pare-feu). Applique immediatement a l'enregistrement.</p>
+        <label class="toggle-row">
+          <span data-i18n="settings_httpapi_enabled">Activer l'API HTTP</span>
+          <input type="checkbox" id="cfg-http-enabled">
+        </label>
+        <div class="form-row">
+          <label><span data-i18n="settings_httpapi_host">Hote d'ecoute</span>
+            <input type="text" id="cfg-http-host" autocomplete="off" spellcheck="false">
+          </label>
+          <label><span data-i18n="settings_httpapi_port">Port</span>
+            <input type="number" id="cfg-http-port" min="1" max="65535">
+          </label>
+        </div>
+        <label><span data-i18n="settings_httpapi_token">Token d'acces (en-tete X-AgentDockyard-Token, vide = sans authentification)</span>
+          <input type="text" id="cfg-http-token" autocomplete="off" spellcheck="false">
+        </label>
+        <button id="btn-http-gen-token" class="btn-secondary" data-i18n="btn_generate_token">&#x1F511; Generer un token</button>
+      </div>
+
+      <div class="settings-section">
         <h3 data-i18n="settings_interface">Interface</h3>
         <label><span data-i18n="settings_refresh_secs">Intervalle de refresh (secondes)</span>
           <input type="number" id="cfg-refresh" min="5" max="300">

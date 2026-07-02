@@ -544,6 +544,40 @@ function createWindow() {
   });
 }
 
+// ─── Serveur HTTP : options et redemarrage a la volee ─────────────────────────
+function buildHttpApiOptions(cfg) {
+  return {
+    config: cfg,
+    version: app.getVersion(),
+    isPackaged: IS_PACKAGED,
+    agentExePath: AGENT_EXE_PATH,
+    agentScriptDev: AGENT_SCRIPT_DEV,
+    dbPath: DB_PATH,
+    getPythonCmd: () => PYTHON_CMD,
+  };
+}
+
+// Redemarre le serveur HTTP si la config httpApi a change (panneau Parametres).
+// Sans cela, host/port/token ne seraient appliques qu'au prochain lancement.
+function maybeRestartHttpApi(beforeHttpCfg, mergedConfig) {
+  const a = beforeHttpCfg || {};
+  const b = (mergedConfig && mergedConfig.httpApi) || {};
+  const same =
+    !!a.enabled === !!b.enabled &&
+    (a.host || '127.0.0.1') === (b.host || '127.0.0.1') &&
+    Number(a.port || 17891) === Number(b.port || 17891) &&
+    (a.token || '') === (b.token || '');
+  if (same) return;
+  try { if (httpApiServer) httpApiServer.close(); } catch (_) { /* ignore */ }
+  httpApiServer = null;
+  try {
+    httpApiServer = startHttpApi(buildHttpApiOptions(mergedConfig));
+    console.log('[http-api] configuration modifiee, serveur redemarre');
+  } catch (e) {
+    console.error('[http-api] redemarrage echoue :', e.message);
+  }
+}
+
 // ─── Smooth scrolling & performance flags ────────────────────────────────────
 app.commandLine.appendSwitch('enable-smooth-scrolling');
 app.commandLine.appendSwitch('enable-gpu-rasterization');
@@ -614,15 +648,7 @@ app.whenReady().then(() => {
       // du panneau Parametres) viderait TOUTES les archives, meme recentes.
       callAgent({ action: 'purger_auto' });
     }
-    httpApiServer = startHttpApi({
-      config: cfg,
-      version: app.getVersion(),
-      isPackaged: IS_PACKAGED,
-      agentExePath: AGENT_EXE_PATH,
-      agentScriptDev: AGENT_SCRIPT_DEV,
-      dbPath: DB_PATH,
-      getPythonCmd: () => PYTHON_CMD,
-    });
+    httpApiServer = startHttpApi(buildHttpApiOptions(cfg));
   } catch (e) { /* ignore */ }
 
   createWindow();
@@ -719,7 +745,12 @@ ipcMain.handle('get-version',    () => app.getVersion());
 
 // ─── IPC : configuration ──────────────────────────────────────────────────────
 ipcMain.handle('get-config',  () => loadConfig());
-ipcMain.handle('save-config', (event, partial) => saveConfig(partial));
+ipcMain.handle('save-config', (event, partial) => {
+  const before = loadConfig();
+  const merged = saveConfig(partial);
+  if (partial && partial.httpApi) maybeRestartHttpApi(before.httpApi, merged);
+  return merged;
+});
 
 // ─── IPC : mise a jour in-app ─────────────────────────────────────────────────
 ipcMain.handle('install-update', () => {

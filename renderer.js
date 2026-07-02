@@ -831,6 +831,12 @@ function bindSettingsPanel() {
     addAgentRow({ id: '', label: '', emoji: '' });
   });
 
+  document.getElementById('btn-http-gen-token').addEventListener('click', () => {
+    const bytes = new Uint8Array(24);
+    crypto.getRandomValues(bytes);
+    document.getElementById('cfg-http-token').value = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  });
+
   document.getElementById('btn-add-widget').addEventListener('click', () => {
     addWidgetRow({ type: 'text', label: '', content: '', url: '', refresh_secondes: 60 });
   });
@@ -851,6 +857,13 @@ async function openSettingsPanel() {
 
   // Reclamations
   document.getElementById('cfg-reclam-heures').value = (currentConfig.reclamation && currentConfig.reclamation.expiration_heures) || 24;
+
+  // API HTTP
+  const httpCfg = currentConfig.httpApi || {};
+  document.getElementById('cfg-http-enabled').checked = httpCfg.enabled !== false;
+  document.getElementById('cfg-http-host').value  = httpCfg.host || '127.0.0.1';
+  document.getElementById('cfg-http-port').value  = httpCfg.port || 17891;
+  document.getElementById('cfg-http-token').value = httpCfg.token || '';
 
   // Interface
   const cfgIf = currentConfig.interface || {};
@@ -1024,6 +1037,12 @@ async function saveSettings() {
     },
     reclamation: {
       expiration_heures: parseInt(document.getElementById('cfg-reclam-heures').value, 10) || 24,
+    },
+    httpApi: {
+      enabled: document.getElementById('cfg-http-enabled').checked,
+      host:  (document.getElementById('cfg-http-host').value || '').trim() || '127.0.0.1',
+      port:  Math.min(65535, Math.max(1, parseInt(document.getElementById('cfg-http-port').value, 10) || 17891)),
+      token: (document.getElementById('cfg-http-token').value || '').trim(),
     },
     interface: {
       refresh_secondes: parseInt(document.getElementById('cfg-refresh').value, 10) || 30,
