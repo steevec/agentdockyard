@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+_(nothing yet)_
+
+## [1.9.0] - 2026-07-02
+
 ### Added
 - **HTTP API section in Settings** — enable/disable the local HTTP API, change the listen host and port, and set an access token directly from the Settings panel, with a one-click **token generator** (24 random bytes, hex). Changes are applied immediately on save: the HTTP server is restarted on the fly with the new configuration, no app restart needed. Previously this required editing `config.json` by hand and relaunching. Translated into the 9 bundled languages.
 - **Checklist progress bars on task cards** — when a task note contains a `- [ ]` / `- [x]` checklist (the recommended `ETAT D AVANCEMENT` format for AI agents), the card now shows a slim progress bar with a `done/total` counter, turning green when everything is checked. Progress is visible at a glance without opening the note.
