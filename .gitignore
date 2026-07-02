@@ -48,6 +48,7 @@ snapshots/
 # ─── Memoire agent (generee, ne pas versionner) ──────────────
 CLAUDE.md
 AGENTS.md
+GEMINI.md
 .github/copilot-instructions.md
 
 # ─── Memoire agent Claude Code (auto-memory) ─────────────────
