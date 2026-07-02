@@ -534,7 +534,18 @@
   </div>
 </div>
 
-<div id="toast"></div>
+<!-- Modal de confirmation (remplace confirm() natif) -->
+<div id="confirm-overlay">
+  <div id="confirm-modal">
+    <div id="confirm-message"></div>
+    <div id="confirm-actions">
+      <button class="btn-secondary" id="confirm-cancel" data-i18n="btn_cancel">Annuler</button>
+      <button class="btn-danger" id="confirm-ok" data-i18n="confirm_btn_ok">Confirmer</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
 
 <!-- Banniere mise a jour -->
 <div id="update-banner" style="display:none">

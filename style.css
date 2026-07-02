@@ -339,6 +339,29 @@ html, body { background: var(--bg); color: var(--text); font-family: var(--font)
 }
 .task-note.visible { display: block; }
 
+/* Progression checklist (notes "- [ ]" / "- [x]") */
+.task-progress { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.task-progress-track {
+  flex: 0 1 160px; height: 4px; border-radius: 2px;
+  background: var(--border-soft); overflow: hidden;
+}
+.task-progress-bar {
+  height: 100%; border-radius: 2px; background: var(--accent);
+  transition: width .3s ease;
+}
+.task-progress.complete .task-progress-bar { background: var(--s-fait); }
+.task-progress-label {
+  font-size: 10.5px; color: var(--text-muted); font-variant-numeric: tabular-nums;
+}
+.task-progress.complete .task-progress-label { color: var(--s-fait-tx); }
+
+/* Surlignage des termes de recherche */
+mark.search-hl {
+  background: rgba(91, 138, 245, .32); color: inherit;
+  border-radius: 2px; padding: 0 1px;
+}
+[data-theme="light"] mark.search-hl { background: rgba(139, 94, 60, .28); }
+
 /* Footer */
 .task-footer { display: flex; align-items: center; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
 .task-date { font-size: 10.5px; color: var(--text-muted); }
@@ -421,17 +444,38 @@ textarea { resize: vertical; min-height: 52px; }
 .btn-save { background: var(--accent); color: #fff; border: none; border-radius: var(--radius); padding: 7px 14px; font-size: 12px; font-weight: 600; cursor: pointer; }
 .btn-save:hover { opacity: .85; }
 
-/* ─── Toast ──────────────────────────────────────────────────────────────────── */
-#toast {
-  position: fixed; bottom: 18px; right: 18px;
+/* ─── Toasts empiles ─────────────────────────────────────────────────────────── */
+#toast-container {
+  position: fixed; bottom: 18px; right: 18px; z-index: 400;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+  pointer-events: none;
+}
+.toast {
   background: var(--bg-card-h); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 9px 16px; font-size: 12px;
   box-shadow: var(--shadow); opacity: 0; transform: translateY(6px);
-  transition: all .2s; pointer-events: none; z-index: 400;
+  transition: opacity .2s, transform .2s; max-width: 420px;
 }
-#toast.show { opacity: 1; transform: translateY(0); }
-#toast.success { border-color: var(--s-fait);   color: var(--s-fait-tx); }
-#toast.error   { border-color: var(--s-urgent); color: var(--danger); }
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast.success { border-color: var(--s-fait);   color: var(--s-fait-tx); }
+.toast.error   { border-color: var(--s-urgent); color: var(--danger); }
+
+/* ─── Modal de confirmation ──────────────────────────────────────────────────── */
+#confirm-overlay {
+  display: none; position: fixed; inset: 0; background: var(--bg-overlay);
+  z-index: 800; align-items: center; justify-content: center;
+}
+#confirm-overlay.visible { display: flex; }
+#confirm-modal {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 8px; width: 420px; max-width: 92vw;
+  box-shadow: var(--modal-shadow); padding: 18px;
+  animation: confirmPop .15s ease;
+}
+@keyframes confirmPop { from { transform: scale(.96); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+#confirm-message { font-size: 13px; line-height: 1.5; white-space: pre-line; margin-bottom: 16px; }
+#confirm-actions { display: flex; gap: 8px; justify-content: flex-end; }
+#confirm-actions .btn-danger { margin-top: 0; }
 
 /* ─── Scrollbar ──────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 5px; }

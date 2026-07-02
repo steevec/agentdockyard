@@ -103,6 +103,8 @@ let editingPromptPath = null;      // null = creation ; sinon [idx] (racine) ou 
 let editingFolderIdx  = null;      // null = creation dossier ; sinon idx du dossier
 let collapsedFolders  = new Set(); // ids des dossiers replies (UI uniquement)
 
+let currentSearchTerms = [];       // termes actifs, utilises pour surligner dans les cartes
+
 // ─── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
   currentConfig = await window.taskAPI.getConfig();
@@ -116,6 +118,7 @@ async function init() {
   bindHeaderButtons();
   bindSearchBox();
   bindModal();
+  bindConfirmModal();
   bindSettingsPanel();
   bindGuidePanel();
   bindSnapshotsPanel();
@@ -155,6 +158,7 @@ async function init() {
       if (si) { si.focus(); si.select(); }
     }
     if (e.key === 'Escape') {
+      if (closeConfirm(false)) return;
       closeModal();
       closePromptModal();
       closeAllDropdowns();
@@ -280,8 +284,13 @@ function isModalOpen() {
   return !!document.querySelector('#modal-overlay.visible');
 }
 
+function isConfirmOpen() {
+  const el = document.getElementById('confirm-overlay');
+  return !!(el && el.classList.contains('visible'));
+}
+
 function isRefreshBlockedByInteraction() {
-  return !!previewFilename || isSidePanelOpen() || isModalOpen() || addBarOpen || openDropdowns.size > 0;
+  return !!previewFilename || isSidePanelOpen() || isModalOpen() || isConfirmOpen() || addBarOpen || openDropdowns.size > 0;
 }
 
 function scheduleDbRefresh() {
@@ -335,6 +344,7 @@ function taskMatchesSearch(task, terms) {
 function buildTasksHtml(tasks, opts) {
   const terms = parseSearchTerms(searchQuery);
   const searching = terms.length > 0;
+  currentSearchTerms = terms;
 
   const visibleTasks = tasks.filter(tk => {
     // En mode recherche, on cherche partout (y compris fait/annule) ; sinon on
@@ -404,6 +414,7 @@ function renderTasks(tasks, opts = {}) {
     showAnnule,
     maxPerGrp,
     search: searchQuery,
+    minute: Math.floor(Date.now() / 60000),  // les dates relatives doivent vieillir
     tasks,
   });
 
@@ -590,14 +601,17 @@ function renderCard(task) {
   const isClaim = !!(task.reclame_par && task.reclame_par.trim());
   const hasNote = !!(task.note && task.note.trim());
   const hasCtx  = !!(task.contexte && task.contexte.trim());
-  const dateCr  = formatDate(task.date_creation);
-  const dateCl  = task.date_cloture ? ' ' + t('task_closed_prefix') + formatDate(task.date_cloture) : '';
+  // Dates relatives ("il y a 2 h") avec la date absolue en tooltip
+  const dateCr  = `<span title="${esc(formatDate(task.date_creation))}">${esc(formatRelative(task.date_creation))}</span>`;
+  const dateCl  = task.date_cloture
+    ? ` ${esc(t('task_closed_prefix'))}<span title="${esc(formatDate(task.date_cloture))}">${esc(formatRelative(task.date_cloture))}</span>`
+    : '';
 
   let h = `<div class="task-card" data-statut="${task.statut}" id="task-${task.id}">`;
   h += `<div class="task-id-col"><div class="task-id-bubble s-${task.statut}">${task.id}</div></div>`;
   h += `<div class="task-body">`;
   h += `<div class="task-top">`;
-  h += `<span class="task-sujet" onclick="openEditModal(${task.id})">${esc(task.sujet)}</span>`;
+  h += `<span class="task-sujet" onclick="openEditModal(${task.id})">${escHl(task.sujet, currentSearchTerms)}</span>`;
 
   h += `<div class="statut-wrapper">`;
   h += `<button class="task-statut-badge badge-${task.statut}" onclick="toggleDropdown(event,${task.id})">${esc(statusLabel(task.statut))}</button>`;
@@ -617,11 +631,21 @@ function renderCard(task) {
   h += `</div>`;
   h += `</div>`;
 
-  if (hasCtx) h += `<div class="task-contexte">${esc(task.contexte)}</div>`;
+  if (hasCtx) h += `<div class="task-contexte">${escHl(task.contexte, currentSearchTerms)}</div>`;
+
+  // Barre de progression si la note contient une checklist "- [ ]" / "- [x]"
+  const check = checklistStats(task.note);
+  if (check) {
+    const pct = Math.round((check.done / check.total) * 100);
+    h += `<div class="task-progress${check.done === check.total ? ' complete' : ''}">`;
+    h += `<div class="task-progress-track"><div class="task-progress-bar" style="width:${pct}%"></div></div>`;
+    h += `<span class="task-progress-label">${check.done}/${check.total}</span>`;
+    h += `</div>`;
+  }
 
   if (hasNote) {
     h += `<span class="task-note-toggle" onclick="toggleNote(${task.id})">${esc(t('task_note_show'))}</span>`;
-    h += `<div class="task-note" id="note-${task.id}">${esc(task.note)}</div>`;
+    h += `<div class="task-note" id="note-${task.id}">${escHl(task.note, currentSearchTerms)}</div>`;
   }
 
   h += `<div class="task-footer">`;
@@ -723,7 +747,7 @@ async function doCloseTask(id) {
 
 async function doDeleteTask(id) {
   const msg = (t('confirm_delete') || 'Delete task #ID?').replace('ID', id);
-  if (!confirm(msg)) return;
+  if (!(await uiConfirm(msg))) return;
   await window.taskAPI.deleteTask(id);
   showToast(t('toast_task_deleted').replace('ID', id), 'success');
   await refreshTasks();
@@ -787,6 +811,41 @@ async function saveModal() {
   showToast(t('toast_task_updated').replace('ID', editingTaskId), 'success');
   closeModal();
   await refreshTasks();
+}
+
+// ─── Modal de confirmation (remplace confirm() natif, bloquant et non stylable) ─
+let confirmResolve = null;
+
+function uiConfirm(message, opts = {}) {
+  return new Promise((resolve) => {
+    if (confirmResolve) { try { confirmResolve(false); } catch (_) {} }
+    confirmResolve = resolve;
+    document.getElementById('confirm-message').textContent = message;
+    const ok = document.getElementById('confirm-ok');
+    ok.textContent = opts.okLabel || t('confirm_btn_ok');
+    document.getElementById('confirm-overlay').classList.add('visible');
+    setTimeout(() => { try { ok.focus(); } catch (_) {} }, 30);
+  });
+}
+
+// Ferme la confirmation si ouverte et resout la promesse. Retourne true si une
+// confirmation etait effectivement ouverte (utile pour le handler Echap).
+function closeConfirm(result) {
+  const overlay = document.getElementById('confirm-overlay');
+  if (!overlay || !overlay.classList.contains('visible')) return false;
+  overlay.classList.remove('visible');
+  const resolve = confirmResolve;
+  confirmResolve = null;
+  if (resolve) resolve(result);
+  flushPendingRefresh();
+  return true;
+}
+
+function bindConfirmModal() {
+  const overlay = document.getElementById('confirm-overlay');
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeConfirm(false); });
+  document.getElementById('confirm-cancel').addEventListener('click', () => closeConfirm(false));
+  document.getElementById('confirm-ok').addEventListener('click', () => closeConfirm(true));
 }
 
 // ─── Panneau lateral generique ────────────────────────────────────────────────
@@ -1119,7 +1178,7 @@ async function applyBoundsFromForm() {
 }
 
 async function doPurgeNow() {
-  if (!confirm(t('confirm_purge'))) return;
+  if (!(await uiConfirm(t('confirm_purge')))) return;
   const r = await window.taskAPI.purgeNow();
   if (r && r.statut === 'OK') {
     showToast(t('toast_purge_ok').replace('COUNT', r.deleted || 0), 'success');
@@ -1646,7 +1705,7 @@ async function deletePromptByPath(pathStr) {
   if (!p || isFolder(p)) return;
   const label = p.title || (t('prompt_no_title') || '(sans titre)');
   const msg = (t('confirm_delete_prompt') || 'Supprimer le prompt "TITLE" ?').replace('TITLE', label);
-  if (!confirm(msg)) return;
+  if (!(await uiConfirm(msg))) return;
   removeItemAtPath(path);
   await persistPromptsConfig();
   renderPromptsList();
@@ -1702,12 +1761,12 @@ async function deleteFolder(idx) {
   let msg;
   if (count === 0) {
     msg = (t('confirm_delete_folder_empty') || 'Supprimer le dossier "NAME" ?').replace('NAME', name);
-    if (!confirm(msg)) return;
+    if (!(await uiConfirm(msg))) return;
     promptsConfig.splice(idx, 1);
   } else {
     msg = (t('confirm_delete_folder_with_children') || 'Le dossier "NAME" contient COUNT prompt(s). Les prompts seront deplaces a la racine. Continuer ?')
             .replace('NAME', name).replace('COUNT', String(count));
-    if (!confirm(msg)) return;
+    if (!(await uiConfirm(msg))) return;
     const kids = f.children.slice();
     promptsConfig.splice(idx, 1);
     promptsConfig.push(...kids);
@@ -2119,7 +2178,7 @@ function closePreview() {
 async function confirmRestore() {
   if (!previewFilename) return;
   const msg = t('preview_restore_confirm');
-  if (!confirm(msg)) return;
+  if (!(await uiConfirm(msg))) return;
   const r = await window.taskAPI.restoreSnapshot(previewFilename);
   if (r && r.ok) {
     showToast(t('preview_restore_ok'), 'success');
@@ -2142,12 +2201,21 @@ function showUpdateBanner(msg, showInstall) {
 }
 
 // ─── Utilitaires ───────────────────────────────────────────────────────────────
-let toastTimer;
+// Toasts empiles : chaque message a son propre element, plusieurs notifications
+// rapprochees restent toutes lisibles au lieu de s'ecraser mutuellement.
 function showToast(msg, type='success') {
-  const el = document.getElementById('toast');
-  el.textContent = msg; el.className = `show ${type}`;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.className = '', 3000);
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  container.appendChild(el);
+  while (container.children.length > 4) container.firstElementChild.remove();
+  requestAnimationFrame(() => el.classList.add('show'));
+  setTimeout(() => {
+    el.classList.remove('show');
+    setTimeout(() => el.remove(), 250);
+  }, 3000);
 }
 
 function esc(s) {
@@ -2158,11 +2226,73 @@ function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
+// esc() + surlignage des termes de recherche : les segments sont echappes
+// separement puis les <mark> inseres par le code (jamais depuis les donnees).
+function escHl(s, terms) {
+  const str = (s === null || s === undefined) ? '' : String(s);
+  if (!terms || !terms.length) return esc(str);
+  const lower = str.toLowerCase();
+  const ranges = [];
+  for (const term of terms) {
+    if (!term) continue;
+    let idx = 0;
+    while ((idx = lower.indexOf(term, idx)) !== -1) {
+      ranges.push([idx, idx + term.length]);
+      idx += term.length;
+    }
+  }
+  if (!ranges.length) return esc(str);
+  ranges.sort((a, b) => a[0] - b[0]);
+  const merged = [ranges[0].slice()];
+  for (const r of ranges.slice(1)) {
+    const last = merged[merged.length - 1];
+    if (r[0] <= last[1]) last[1] = Math.max(last[1], r[1]);
+    else merged.push(r.slice());
+  }
+  let out = '', pos = 0;
+  for (const [s0, e0] of merged) {
+    out += esc(str.slice(pos, s0)) + '<mark class="search-hl">' + esc(str.slice(s0, e0)) + '</mark>';
+    pos = e0;
+  }
+  return out + esc(str.slice(pos));
+}
+
 function j(s) { return JSON.stringify(s); }
 
 function formatDate(d) {
   if (!d || d.length < 12) return d || '';
   return `${d.slice(6,8)}/${d.slice(4,6)}/${d.slice(0,4)} ${d.slice(8,10)}:${d.slice(10,12)}`;
+}
+
+function parseTaskDate(d) {
+  if (!d || d.length < 12) return null;
+  const dt = new Date(+d.slice(0,4), +d.slice(4,6) - 1, +d.slice(6,8), +d.slice(8,10), +d.slice(10,12), +(d.slice(12,14) || 0));
+  return isNaN(dt.getTime()) ? null : dt;
+}
+
+// Date relative localisee ("il y a 2 heures", "hier") via Intl, pour les
+// evenements de moins de 7 jours ; au-dela (ou en cas d'echec), date absolue.
+function formatRelative(d) {
+  const dt = parseTaskDate(d);
+  if (!dt) return d || '';
+  const diffMin = Math.round((Date.now() - dt.getTime()) / 60000);
+  if (diffMin < 0 || diffMin > 7 * 24 * 60) return formatDate(d);
+  try {
+    const rtf = new Intl.RelativeTimeFormat(currentLang, { numeric: 'auto' });
+    if (diffMin < 1) return rtf.format(0, 'second');
+    if (diffMin < 60) return rtf.format(-diffMin, 'minute');
+    if (diffMin < 24 * 60) return rtf.format(-Math.round(diffMin / 60), 'hour');
+    return rtf.format(-Math.round(diffMin / (24 * 60)), 'day');
+  } catch (_) { return formatDate(d); }
+}
+
+// Compte les cases "- [ ]" / "- [x]" d'une note (checklists ETAT D AVANCEMENT).
+function checklistStats(note) {
+  if (!note) return null;
+  const boxes = String(note).match(/^\s*[-*]\s*\[( |x|X)\]/gm);
+  if (!boxes || !boxes.length) return null;
+  const done = boxes.filter(b => /\[[xX]\]/.test(b)).length;
+  return { done, total: boxes.length };
 }
 
 // ─── Expose pour les onclick inline generes dynamiquement ─────────────────────
