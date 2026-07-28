@@ -5,7 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-_(nothing yet)_
+### Fixed
+- **Notes larger than ~32 000 characters could no longer be saved** — the JSON payload was passed to `agent.exe` as a command-line argument, and Windows caps a command line at 32 767 characters. Past that, `CreateProcess` failed with `ENAMETOOLONG` and the HTTP API returned a bare 500: a long note (a detailed hand-over report, a technical journal) became impossible to extend, even by 500 characters. Payloads over 30 000 characters are now streamed through **stdin** (`agent.py` accepts `-` as its payload argument), which has no size limit. Shorter payloads keep the existing argument path unchanged, so older `agent.exe` builds are unaffected. Verified end-to-end with a 46 118-character payload, accents intact; the same payload passed as an argument still fails with `ENAMETOOLONG`, confirming the root cause.
 
 ## [1.9.0] - 2026-07-02
 

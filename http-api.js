@@ -59,16 +59,26 @@ function readJsonBody(req) {
   });
 }
 
+// Windows plafonne une ligne de commande a 32767 caracteres. Au-dela, CreateProcess
+// echoue et l API rendait un 500 sans message : une note de ~32 000 caracteres devenait
+// impossible a completer, meme de 500 caracteres. Passe ce seuil, on envoie le payload
+// par STDIN (argv[1] = '-'), qui n a pas de limite.
+// Le seuil reste haut volontairement : en dessous, l ancien chemin par argument continue
+// de fonctionner tel quel, y compris avec un agent.exe anterieur a ce correctif.
+const MAX_PAYLOAD_ARGV = 30000;
+
 function callAgentRaw(payload, options) {
   return new Promise((resolve) => {
     const payloadJson = JSON.stringify(payload);
+    const parStdin = payloadJson.length > MAX_PAYLOAD_ARGV;
+    const argPayload = parStdin ? '-' : payloadJson;
     const dbPath = options.dbPath;
     let bin;
     let args;
 
     if (options.isPackaged) {
       bin = options.agentExePath;
-      args = [payloadJson, dbPath];
+      args = [argPayload, dbPath];
     } else {
       const pythonCmd = options.getPythonCmd();
       if (!pythonCmd) {
@@ -80,7 +90,7 @@ function callAgentRaw(payload, options) {
         return;
       }
       bin = pythonCmd;
-      args = [options.agentScriptDev, payloadJson, dbPath];
+      args = [options.agentScriptDev, argPayload, dbPath];
     }
 
     let stdout = '';
@@ -108,6 +118,14 @@ function callAgentRaw(payload, options) {
       try { child.kill(); } catch (_) { /* ignore */ }
       resolve({ stdout, stderr: stderr || 'Timeout', exitCode: 1 });
     }, AGENT_TIMEOUT_MS);
+
+    if (parStdin) {
+      // Le payload part par le pipe d entree. Une erreur ici (agent deja mort, pipe
+      // ferme) ne doit pas remonter en exception non capturee : le handler 'error' /
+      // 'close' du child rend deja la main a l appelant.
+      child.stdin.on('error', () => { /* le child a ferme son entree : gere plus bas */ });
+      child.stdin.end(payloadJson, 'utf8');
+    }
 
     // setEncoding : evite de corrompre un caractere UTF-8 multi-octets coupe
     // entre deux chunks du pipe stdout/stderr.
@@ -251,4 +269,4 @@ function startHttpApi(options) {
   return server;
 }
 
-module.exports = { startHttpApi };
+module.exports = { startHttpApi, MAX_PAYLOAD_ARGV };

@@ -42,6 +42,10 @@ if hasattr(sys.stdout, 'buffer'):
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace', line_buffering=True)
 if hasattr(sys.stderr, 'buffer'):
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace', line_buffering=True)
+# Meme raison cote entree : le payload lu sur stdin (mode '-') est de l UTF-8, alors que
+# le defaut Windows est cp1252 — une note accentuee arriverait corrompue ou leverait.
+if hasattr(sys.stdin, 'buffer'):
+    sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8', errors='replace')
 
 # ─── Chemins ──────────────────────────────────────────────────────────────────
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -573,8 +577,18 @@ def main():
         print(json.dumps(nok('Usage : python agent.py \'{"action":"...", ...}\'')))
         sys.exit(1)
 
+    # argv[1] == '-' : le payload arrive par STDIN au lieu de la ligne de commande.
+    # Windows plafonne une ligne de commande a 32767 caracteres : au-dela, CreateProcess
+    # echoue et l appelant ne recoit qu une erreur opaque. Une note longue (compte rendu
+    # detaille, journal technique) depassait ce seuil et rendait tout ajout impossible.
+    # STDIN n a pas de limite : c est la seule voie fiable pour les gros payloads.
+    if sys.argv[1] == '-':
+        payload_brut = sys.stdin.read()
+    else:
+        payload_brut = sys.argv[1]
+
     try:
-        data_in = json.loads(sys.argv[1])
+        data_in = json.loads(payload_brut)
     except json.JSONDecodeError as e:
         print(json.dumps(nok(f"JSON invalide : {e}")))
         sys.exit(1)

@@ -16,7 +16,7 @@ const http            = require('http');
 const https           = require('https');
 const { URL }         = require('url');
 const { spawnSync, spawn } = require('child_process');
-const { startHttpApi } = require('./http-api');
+const { startHttpApi, MAX_PAYLOAD_ARGV } = require('./http-api');
 
 // electron-updater : lazy-load pour ne pas crasher en dev (il appelle app.getVersion() au require)
 let _autoUpdater = null;
@@ -180,14 +180,20 @@ function detectPython() {
 function callAgent(payload, dbPathOverride) {
   return new Promise((resolve) => {
     const dbPath = dbPathOverride || DB_PATH;
+    // Au-dela de MAX_PAYLOAD_ARGV, le payload passe par STDIN : la ligne de commande
+    // Windows plafonne a 32767 caracteres et une note longue la faisait deborder,
+    // avec pour seul symptome un echec sans message. Cf. http-api.js, meme seuil.
+    const payloadJson = JSON.stringify(payload);
+    const parStdin    = payloadJson.length > MAX_PAYLOAD_ARGV;
+    const argPayload  = parStdin ? '-' : payloadJson;
     let bin, args;
     if (IS_PACKAGED) {
       bin  = AGENT_EXE_PATH;
-      args = [JSON.stringify(payload), dbPath];
+      args = [argPayload, dbPath];
     } else {
       if (!PYTHON_CMD) return resolve({ statut: 'NOK', message: 'Python introuvable (mode dev)' });
       bin  = PYTHON_CMD;
-      args = [AGENT_SCRIPT_DEV, JSON.stringify(payload), dbPath];
+      args = [AGENT_SCRIPT_DEV, argPayload, dbPath];
     }
 
     let stdout = '';
@@ -208,6 +214,13 @@ function callAgent(payload, dbPathOverride) {
     } catch (err) {
       console.error('[callAgent] spawn a lance une exception :', err && err.message);
       return resolve({ statut: 'NOK', message: 'Spawn impossible : ' + (err && err.message || 'erreur inconnue') });
+    }
+
+    if (parStdin) {
+      // Une erreur d ecriture sur ce pipe (child deja mort) ne doit pas remonter en
+      // exception non capturee : les handlers 'error'/'close' ci-dessous rendent la main.
+      child.stdin.on('error', () => { /* entree fermee cote child : gere plus bas */ });
+      child.stdin.end(payloadJson, 'utf8');
     }
 
     const timer = setTimeout(() => {
