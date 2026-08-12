@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
 """
+ATTENTION — CE MOTEUR N'EST PLUS CELUI QUI SERT LES AGENTS (depuis le 12/08/2026).
+
+Les appels a http://192.168.1.62:17891/api/agentdockyard sont desormais traites par Nexa
+(D:/IA/agent-local), qui a repris ces 16 actions a l'identique dans src/server/taches.js. La
+fidelite a ete verifiee par un test differentiel rejouant le meme scenario sur les deux moteurs
+(tests/taches-socle.test.js). Ce fichier reste la comme reference du comportement d'origine.
+
+Voir MIGRATION-VERS-NEXA.md a la racine du depot.
+
 agent.py — Interface Python pour les agents IA (Claude Code, Claude Cowork, Copilot...)
 
 Stockage : SQLite (tasks.db), journal_mode=OFF.

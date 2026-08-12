@@ -1,4 +1,14 @@
 /**
+ * ATTENTION — CE PROJET N'EST PLUS LA SOURCE DE VERITE DES TACHES (12/08/2026).
+ * La file est passee dans Nexa (D:/IA/agent-local). 368 taches migrees, dernier id 6292, les 118
+ * actives verifiees une par une. Lire MIGRATION-VERS-NEXA.md AVANT toute intervention ici.
+ *
+ * NE PAS relancer cette application avec son serveur HTTP actif : au demarrage, probeHealth()
+ * cherche SA propre signature sur 17891, ne la trouve pas (c'est le relais de Nexa qui repond) et
+ * conclut que le port est libre. Windows accepte alors un second bind sur 127.0.0.1 et repartit
+ * les connexions entre les deux serveurs : la moitie des taches des agents partirait dans cette
+ * base-ci, en silence. `httpApi.enabled` a ete mis a false dans la config pour cette raison.
+ *
  * main.js - Electron main process
  * AgentDockyard - stockage SQLite via agent (Python en dev, .exe autonome en prod).
  *
