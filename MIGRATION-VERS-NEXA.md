@@ -43,7 +43,15 @@ Le raccourci de démarrage automatique a été retiré vers
 | — (n'existait pas) | `src/relais/relais-taches.js` : garde les tâches pendant que Nexa redémarre |
 | — (n'existait pas) | `src/server/taches-entrantes.js` : dépôt depuis l'extérieur, par jeton |
 
-L'API publique n'a pas changé d'un caractère : `POST http://192.168.1.62:17891/api/agentdockyard`,
-mêmes actions, même enveloppe de réponse. Les ~400 `CLAUDE.md` et les skills planifiées n'ont pas
-été touchés. La fidélité de la reprise a été vérifiée par un test différentiel qui rejoue le même
-scénario sur les deux moteurs et compare les réponses (`tests/taches-socle.test.js` côté Nexa).
+L'API publique n'a pas changé d'un caractère au moment de la bascule :
+`POST http://192.168.1.62:17891/api/agentdockyard`, mêmes actions, même enveloppe de réponse. Les
+~400 `CLAUDE.md` et les skills planifiées n'ont pas été touchés. La fidélité de la reprise a été
+vérifiée par un test différentiel qui rejoue le même scénario sur les deux moteurs et compare les
+réponses (`tests/taches-socle.test.js` côté Nexa).
+
+**Mise à jour du 30/08/2026 (tâche #8301) : le nom canonique est devenu `/api/taches`.** Les deux
+chemins répondent toujours à l'identique — rien ne casse — mais `/api/agentdockyard` ne doit plus
+être écrit dans du code neuf ni cité à Steeve : c'est le nom de l'application Electron arrêtée, pas
+celui du service qui répond aujourd'hui. Endpoint actuel :
+`POST http://192.168.1.62:17891/api/taches`. Détail complet :
+`D:/Developpement/agent-memory/thematique/81-file-de-taches-nexa-reference-api.md`.
